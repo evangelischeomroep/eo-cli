@@ -13,6 +13,13 @@ import (
 	"time"
 )
 
+type azureErrorBody struct {
+	Error struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+	} `json:"error"`
+}
+
 const (
 	ContributorRoleID = "b24988ac-6180-42a0-ab88-20f7382dd24c"
 	OwnerRoleID       = "8e3af657-a8ff-443c-a75c-2fe8c4bcb635"
@@ -35,7 +42,11 @@ type APIError struct {
 }
 
 func (e *APIError) Error() string {
-	return fmt.Sprintf("%s %s: %d %s", e.Method, e.URL, e.StatusCode, e.Body)
+	var parsed azureErrorBody
+	if err := json.Unmarshal([]byte(e.Body), &parsed); err == nil && parsed.Error.Message != "" {
+		return parsed.Error.Message
+	}
+	return fmt.Sprintf("HTTP %d: %s", e.StatusCode, e.Body)
 }
 
 var httpClient = &http.Client{Timeout: 30 * time.Second}

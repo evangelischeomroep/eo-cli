@@ -1,36 +1,98 @@
 # eo-cli
 
-A command-line tool for EO (Evangelische Omroep) developers to automate common tasks.
-
-## Requirements
-
-- [Go](https://golang.org/) 1.25+
-- [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli) (logged in via `az login`)
+Developer CLI for Evangelische Omroep. Currently focused on Azure PIM: activating your own role and approving requests from teammates.
 
 ## Installation
 
-```bash
-go build -o eo ./cmd/eo
-```
+### macOS (recommended)
 
-## Commands
+Download the correct binary from the [Releases page](https://github.com/evangelischeomroep/eo-cli/releases/latest):
 
-### `pim`
-
-Requests the Contributor role on the EO Studio Digitaal Azure subscription for 8 hours via Azure PIM (Privileged Identity Management).
-
-```bash
-eo pim [justification]
-```
-
-**Arguments:**
-
-| Argument        | Required | Default                                         |
-| --------------- | -------- | ----------------------------------------------- |
-| `justification` | No       | `Requesting access to perform necessary tasks.` |
-
-**Example:**
+| Mac | File |
+|-----|------|
+| Apple Silicon (M1/M2/M3) | `eo_darwin_arm64.tar.gz` |
+| Intel | `eo_darwin_amd64.tar.gz` |
 
 ```bash
-eo pim "Deploying hotfix to production"
+# Replace the URL with the correct architecture for your machine
+curl -L https://github.com/evangelischeomroep/eo-cli/releases/latest/download/eo_darwin_arm64.tar.gz | tar xz
+sudo mv eo /usr/local/bin/
 ```
+
+Verify the installation:
+
+```bash
+eo version
+```
+
+### Via Go (developers)
+
+If you have Go installed:
+
+```bash
+go install github.com/evangelischeomroep/eo-cli/cmd/eo@latest
+```
+
+## Requirements
+
+- [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli) installed and logged in (`az login`)
+- Access to the _EO Studio Digitaal_ subscription
+- For `pim approve`: you must be an approver on the relevant PIM policy
+
+## Usage
+
+```
+eo <command> [flags] [arguments]
+```
+
+### `eo pim`
+
+Activate the Contributor role for 8 hours.
+
+```bash
+eo pim
+eo pim "deploying release 2.4"
+```
+
+### `eo pim approve`
+
+List pending PIM requests and approve them.
+
+```bash
+# Interactive — pick which requests to approve
+eo pim approve
+
+# Approve everything at once
+eo pim approve --all
+
+# With a custom justification
+eo pim approve --all "sprint review batch"
+```
+
+### `eo version`
+
+Print the current version.
+
+```bash
+eo version
+```
+
+### Help
+
+```bash
+eo --help
+eo pim --help
+eo pim approve --help
+```
+
+## Releasing a new version
+
+1. Make sure all changes are on `main`
+2. Tag the new version and push:
+
+```bash
+git tag v1.2.3
+git push origin v1.2.3
+```
+
+GitHub Actions will automatically build binaries for macOS (Intel + ARM) and Linux and publish a GitHub Release.

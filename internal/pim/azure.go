@@ -1,131 +1,125 @@
 package pim
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os/exec"
 	"strings"
+	"time"
 )
 
-type RequestBody struct {
-	Properties Properties `json:"properties"`
+const (
+	ContributorRoleID = "b24988ac-6180-42a0-ab88-20f7382dd24c"
+	OwnerRoleID       = "8e3af657-a8ff-443c-a75c-2fe8c4bcb635"
+	ReaderRoleID      = "acdd72a7-3385-48ef-bd42-f606fba81ae7"
+
+	SubscriptionName = "EO Studio Digitaal"
+
+	armBaseURL         = "https://management.azure.com"
+	scheduleAPIVersion = "2020-10-01"
+	approvalAPIVersion = "2021-01-01-preview"
+)
+
+var ErrRoleAlreadyActive = errors.New("role is already active")
+
+type APIError struct {
+	Method     string
+	URL        string
+	StatusCode int
+	Body       string
 }
 
-type Properties struct {
-	PrincipalID      string `json:"principalId"`
-	RoleDefinitionID string `json:"roleDefinitionId"`
-	RequestType      string `json:"requestType"`
-	Justification    string `json:"justification"`
-	ScheduleInfo     `json:"scheduleInfo"`
+func (e *APIError) Error() string {
+	return fmt.Sprintf("%s %s: %d %s", e.Method, e.URL, e.StatusCode, e.Body)
 }
 
-type ScheduleInfo struct {
-	StartDateTime *string `json:"startDateTime"`
-	Expiration    `json:"expiration"`
-}
+var httpClient = &http.Client{Timeout: 30 * time.Second}
 
-type Expiration struct {
-	Type     string `json:"type"`
-	Duration string `json:"duration"`
+// azureRequest performs an authenticated JSON call against ARM. Non-2xx
+// responses are returned as *APIError so callers can inspect the status code.
+func azureRequest(method, url, accessToken string, body, out any) error {
+	var reqBody io.Reader
+	if body != nil {
+		buf, err := json.Marshal(body)
+		if err != nil {
+			return err
+		}
+		reqBody = bytes.NewReader(buf)
+	}
+
+	req, err := http.NewRequest(method, url, reqBody)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	res, err := httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		errBody, _ := io.ReadAll(res.Body)
+		return &APIError{
+			Method:     method,
+			URL:        url,
+			StatusCode: res.StatusCode,
+			Body:       strings.TrimSpace(string(errBody)),
+		}
+	}
+
+	if out != nil {
+		if err := json.NewDecoder(res.Body).Decode(out); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func GetSubscriptionID() (string, error) {
-	cmd, err := exec.Command("az", "account", "list", "--query", "[?name=='EO Studio Digitaal'].id", "-o", "tsv").Output()
+	out, err := exec.Command("az", "account", "list",
+		"--query", fmt.Sprintf("[?name=='%s'].id", SubscriptionName),
+		"-o", "tsv").Output()
 	if err != nil {
 		return "", err
 	}
-
-	subscriptionID := strings.Trim(string(cmd), "\n")
-	return subscriptionID, nil
+	return strings.TrimSpace(string(out)), nil
 }
 
 func GetUserID() (string, error) {
-	cmd, err := exec.Command("az", "ad", "signed-in-user", "show", "--query", "id", "-o", "tsv").Output()
+	out, err := exec.Command("az", "ad", "signed-in-user", "show",
+		"--query", "id", "-o", "tsv").Output()
 	if err != nil {
 		return "", err
 	}
-
-	userID := strings.Trim(string(cmd), "\n")
-	return userID, nil
+	return strings.TrimSpace(string(out)), nil
 }
 
 func GetAccessToken() (string, error) {
-	cmd, err := exec.Command("az", "account", "get-access-token", "--query", "accessToken", "-o", "tsv").Output()
+	out, err := exec.Command("az", "account", "get-access-token",
+		"--query", "accessToken", "-o", "tsv").Output()
 	if err != nil {
 		return "", err
 	}
-
-	accessToken := strings.Trim(string(cmd), "\n")
-
-	return accessToken, nil
+	return strings.TrimSpace(string(out)), nil
 }
 
+// GenerateUUID returns a random RFC 4122 v4 UUID.
 func GenerateUUID() (string, error) {
-	byteSlice := make([]byte, 16)
-	_, err := rand.Read(byteSlice)
-	if err != nil {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
 		return "", err
 	}
-
-	uuid := fmt.Sprintf("%x-%x-%x-%x-%x", byteSlice[0:4], byteSlice[4:6], byteSlice[6:8], byteSlice[8:10], byteSlice[10:])
-
-	return uuid, nil
-}
-
-func RequestContributerRole(subscriptionID, userID, accessToken, justification string) error {
-	requestBody := RequestBody{
-		Properties: Properties{
-			PrincipalID:      userID,
-			RoleDefinitionID: fmt.Sprintf("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/b24988ac-6180-42a0-ab88-20f7382dd24c", subscriptionID),
-			RequestType:      "SelfActivate",
-			Justification:    justification,
-			ScheduleInfo: ScheduleInfo{
-				StartDateTime: nil,
-				Expiration: Expiration{
-					Type:     "AfterDuration",
-					Duration: "PT8H",
-				},
-			},
-		},
-	}
-
-	serializedRequestBody, err := json.Marshal(requestBody)
-	if err != nil {
-		return err
-	}
-
-	uuid, err := GenerateUUID()
-	if err != nil {
-		return err
-	}
-
-	req, err := http.NewRequest("PUT", fmt.Sprintf("https://management.azure.com/subscriptions/%s/providers/Microsoft.Authorization/roleAssignmentScheduleRequests/%s?api-version=2020-10-01", subscriptionID, uuid), strings.NewReader(string(serializedRequestBody)))
-	if err != nil {
-		return err
-	}
-
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{}
-
-	res, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-
-	defer res.Body.Close()
-
-	switch res.StatusCode {
-	case http.StatusCreated:
-		fmt.Println("Done! Requested Contributor role.")
-	case http.StatusConflict:
-		fmt.Println("Request failed. Possibly the role is already active.")
-	default:
-		fmt.Printf("Request failed with status code: %d\n", res.StatusCode)
-	}
-
-	return nil
+	b[6] = (b[6] & 0x0f) | 0x40 // version 4
+	b[8] = (b[8] & 0x3f) | 0x80 // variant RFC 4122
+	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:]), nil
 }

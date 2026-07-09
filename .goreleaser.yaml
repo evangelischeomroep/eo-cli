@@ -1,0 +1,43 @@
+version: 2
+
+project_name: eo
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: eo
+    main: ./cmd/eo
+    binary: eo
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+
+archives:
+  - formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^chore:"
+      - "^ci:"
+      - "^docs:"
+
+release:
+  github:
+    owner: evangelischeomroep
+    name: eo-cli
+  name_template: "v{{ .Version }}"

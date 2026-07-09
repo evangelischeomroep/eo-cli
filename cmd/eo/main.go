@@ -202,9 +202,7 @@ func cmdCompletion(shell string) error {
 	return nil
 }
 
-const zshCompletion = `#compdef eo
-
-_eo() {
+const zshCompletion = `_eo() {
   local state
 
   _arguments \
@@ -239,7 +237,7 @@ _eo() {
   esac
 }
 
-_eo "$@"
+compdef _eo eo
 `
 
 const bashCompletion = `_eo_completion() {

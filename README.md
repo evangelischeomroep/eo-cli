@@ -69,6 +69,29 @@ eo pim approve --all
 eo pim approve --all "sprint review batch"
 ```
 
+### `eo completion`
+
+Output a shell completion script so Tab autocompletes commands.
+
+**zsh** — add to `~/.zshrc`:
+
+```zsh
+source <(eo completion zsh)
+```
+
+**bash** — add to `~/.bashrc`:
+
+```bash
+source <(eo completion bash)
+```
+
+After reloading your shell (`source ~/.zshrc` or open a new terminal), Tab completion works:
+
+```
+eo p<Tab>        → eo pim
+eo pim <Tab>     → eo pim approve
+```
+
 ### `eo version`
 
 Print the current version.

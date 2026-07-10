@@ -1,4 +1,4 @@
-package pim
+package azure
 
 import (
 	"bytes"
@@ -27,9 +27,9 @@ const (
 
 	SubscriptionName = "EO Studio Digitaal"
 
-	armBaseURL         = "https://management.azure.com"
-	scheduleAPIVersion = "2020-10-01"
-	approvalAPIVersion = "2021-01-01-preview"
+	ArmBaseURL         = "https://management.azure.com"
+	ScheduleAPIVersion = "2020-10-01"
+	ApprovalAPIVersion = "2021-01-01-preview"
 )
 
 var ErrRoleAlreadyActive = errors.New("role is already active")
@@ -53,7 +53,7 @@ var httpClient = &http.Client{Timeout: 30 * time.Second}
 
 // azureRequest performs an authenticated JSON call against ARM. Non-2xx
 // responses are returned as *APIError so callers can inspect the status code.
-func azureRequest(method, url, accessToken string, body, out any) error {
+func AzureRequest(method, url, accessToken string, body, out any) error {
 	var reqBody io.Reader
 	if body != nil {
 		buf, err := json.Marshal(body)

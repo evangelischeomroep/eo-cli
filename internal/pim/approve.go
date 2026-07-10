@@ -4,12 +4,14 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+
+	"github.com/evangelischeomroep/eo-cli/internal/azure"
 )
 
 var wellKnownRoles = map[string]string{
-	ContributorRoleID: "Contributor",
-	OwnerRoleID:       "Owner",
-	ReaderRoleID:      "Reader",
+	azure.ContributorRoleID: "Contributor",
+	azure.OwnerRoleID:       "Owner",
+	azure.ReaderRoleID:      "Reader",
 }
 
 type ScheduleRequestProperties struct {
@@ -65,11 +67,11 @@ func RoleDisplayName(roleDefinitionID string) string {
 func ListPendingApprovals(subscriptionID, accessToken string) ([]ScheduleRequest, error) {
 	url := fmt.Sprintf(
 		"%s/subscriptions/%s/providers/Microsoft.Authorization/roleAssignmentScheduleRequests?api-version=%s&$filter=asApprover()",
-		armBaseURL, subscriptionID, scheduleAPIVersion,
+		azure.ArmBaseURL, subscriptionID, azure.ScheduleAPIVersion,
 	)
 
 	var response ScheduleRequestsResponse
-	if err := azureRequest(http.MethodGet, url, accessToken, nil, &response); err != nil {
+	if err := azure.AzureRequest(http.MethodGet, url, accessToken, nil, &response); err != nil {
 		return nil, err
 	}
 
@@ -95,11 +97,11 @@ func ApproveScheduleRequest(subscriptionID, accessToken string, request Schedule
 
 	approvalURL := fmt.Sprintf(
 		"%s/subscriptions/%s/providers/Microsoft.Authorization/roleAssignmentApprovals/%s?api-version=%s",
-		armBaseURL, subscriptionID, approvalName, approvalAPIVersion,
+		azure.ArmBaseURL, subscriptionID, approvalName, azure.ApprovalAPIVersion,
 	)
 
 	var approval Approval
-	if err := azureRequest(http.MethodGet, approvalURL, accessToken, nil, &approval); err != nil {
+	if err := azure.AzureRequest(http.MethodGet, approvalURL, accessToken, nil, &approval); err != nil {
 		return fmt.Errorf("fetching approval: %w", err)
 	}
 
@@ -118,7 +120,7 @@ func ApproveScheduleRequest(subscriptionID, accessToken string, request Schedule
 
 	stageURL := fmt.Sprintf(
 		"%s/subscriptions/%s/providers/Microsoft.Authorization/roleAssignmentApprovals/%s/stages/%s?api-version=%s",
-		armBaseURL, subscriptionID, approvalName, activeStageName, approvalAPIVersion,
+		azure.ArmBaseURL, subscriptionID, approvalName, activeStageName, azure.ApprovalAPIVersion,
 	)
 
 	body := map[string]any{
@@ -128,5 +130,5 @@ func ApproveScheduleRequest(subscriptionID, accessToken string, request Schedule
 		},
 	}
 
-	return azureRequest(http.MethodPatch, stageURL, accessToken, body, nil)
+	return azure.AzureRequest(http.MethodPatch, stageURL, accessToken, body, nil)
 }

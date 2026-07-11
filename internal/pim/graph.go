@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"os/exec"
 	"strings"
+
+	"github.com/evangelischeomroep/eo-cli/internal/azure"
 )
 
 const graphBaseURL = "https://graph.microsoft.com/v1.0"
@@ -66,7 +68,7 @@ func LookupPrincipals(ids []string, graphToken string) (map[string]Principal, er
 	}
 
 	url := graphBaseURL + "/directoryObjects/getByIds"
-	if err := azureRequest(http.MethodPost, url, graphToken, body, &resp); err != nil {
+	if err := azure.AzureRequest(http.MethodPost, url, graphToken, body, &resp); err != nil {
 		return nil, err
 	}
 

@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+
+	"github.com/evangelischeomroep/eo-cli/internal/azure"
 )
 
 type RequestBody struct {
@@ -32,7 +34,7 @@ type Expiration struct {
 // subscription for 8 hours. Returns ErrRoleAlreadyActive if the role is
 // already active.
 func RequestContributorRole(subscriptionID, userID, accessToken, justification string) error {
-	uuid, err := GenerateUUID()
+	uuid, err := azure.GenerateUUID()
 	if err != nil {
 		return err
 	}
@@ -42,7 +44,7 @@ func RequestContributorRole(subscriptionID, userID, accessToken, justification s
 			PrincipalID: userID,
 			RoleDefinitionID: fmt.Sprintf(
 				"/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/%s",
-				subscriptionID, ContributorRoleID,
+				subscriptionID, azure.ContributorRoleID,
 			),
 			RequestType:   "SelfActivate",
 			Justification: justification,
@@ -57,13 +59,13 @@ func RequestContributorRole(subscriptionID, userID, accessToken, justification s
 
 	url := fmt.Sprintf(
 		"%s/subscriptions/%s/providers/Microsoft.Authorization/roleAssignmentScheduleRequests/%s?api-version=%s",
-		armBaseURL, subscriptionID, uuid, scheduleAPIVersion,
+		azure.ArmBaseURL, subscriptionID, uuid, azure.ScheduleAPIVersion,
 	)
 
-	if err := azureRequest(http.MethodPut, url, accessToken, body, nil); err != nil {
-		var apiErr *APIError
+	if err := azure.AzureRequest(http.MethodPut, url, accessToken, body, nil); err != nil {
+		var apiErr *azure.APIError
 		if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusConflict {
-			return ErrRoleAlreadyActive
+			return azure.ErrRoleAlreadyActive
 		}
 		return err
 	}

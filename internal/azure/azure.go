@@ -51,7 +51,7 @@ func (e *APIError) Error() string {
 
 var httpClient = &http.Client{Timeout: 30 * time.Second}
 
-// azureRequest performs an authenticated JSON call against ARM. Non-2xx
+// AzureRequest performs an authenticated JSON call against ARM. Non-2xx
 // responses are returned as *APIError so callers can inspect the status code.
 func AzureRequest(method, url, accessToken string, body, out any) error {
 	var reqBody io.Reader

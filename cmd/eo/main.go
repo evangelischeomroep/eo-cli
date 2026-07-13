@@ -29,6 +29,10 @@ func run(args []string) error {
 		fmt.Printf("eo %s\n", version)
 		return nil
 	case "deploy":
+		if hasHelpFlag(args[1:]) {
+			printDeployHelp()
+			return nil
+		}
 		return cmdDeploy(args[1:])
 	case "pim":
 		if len(args) >= 2 && args[1] == "approve" {

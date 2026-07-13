@@ -14,9 +14,15 @@ func cmdDeploy(args []string) error {
 	if err != nil {
 		return err
 	}
-	env := "test"
-	if len(args) > 0 && !strings.HasPrefix(args[0], "--") {
+	env := ""
+	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
 		env = args[0]
+	}
+	if env == "" {
+		if hasFlag(args, "--all", "-a") {
+			return fmt.Errorf("specify an environment: eo deploy test --all or eo deploy prod --all")
+		}
+		env = "test"
 	}
 
 	apps, err := deploy.ListFunctionApps(creds.subscriptionID, creds.accessToken, env)

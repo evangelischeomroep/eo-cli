@@ -24,6 +24,9 @@ func cmdDeploy(args []string) error {
 		}
 		env = "test"
 	}
+	if env != "test" && env != "prod" {
+		return fmt.Errorf("unknown environment %q — use test or prod", env)
+	}
 
 	apps, err := deploy.ListFunctionApps(creds.subscriptionID, creds.accessToken, env)
 	if err != nil {

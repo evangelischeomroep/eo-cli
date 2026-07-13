@@ -14,12 +14,12 @@ import (
 //go:embed pipeline-map.json
 var pipelineMapData []byte
 
-func loadPipelineMap() map[string]string {
+func loadPipelineMap() (map[string]string, error) {
 	var m map[string]string
 	if err := json.Unmarshal(pipelineMapData, &m); err != nil {
-		panic("pipeline-map.json is invalid: " + err.Error())
+		return nil, fmt.Errorf("pipeline-map.json is invalid: %w", err)
 	}
-	return m
+	return m, nil
 }
 
 func pipelineName(baseName string, overrides map[string]string) string {
@@ -79,7 +79,10 @@ func cmdDeploy(args []string) error {
 		pipelineByName[p.Name] = p
 	}
 
-	pipelineOverrides := loadPipelineMap()
+	pipelineOverrides, err := loadPipelineMap()
+	if err != nil {
+		return err
+	}
 
 	if env == "prod" {
 		var confirmed bool

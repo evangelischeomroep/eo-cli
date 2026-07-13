@@ -124,6 +124,16 @@ func GetAccessToken() (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
+func GetDevOpsActionToken() (string, error) {
+	out, err := exec.Command("az", "account", "get-access-token",
+		"--resource", "499b84ac-1321-427f-aa17-267ca6975798",
+		"--query", "accessToken", "-o", "tsv").Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
 // GenerateUUID returns a random RFC 4122 v4 UUID.
 func GenerateUUID() (string, error) {
 	b := make([]byte, 16)

@@ -51,7 +51,7 @@ func (e *APIError) Error() string {
 
 var httpClient = &http.Client{Timeout: 30 * time.Second}
 
-// azureRequest performs an authenticated JSON call against ARM. Non-2xx
+// AzureRequest performs an authenticated JSON call against Azure REST APIs. Non-2xx
 // responses are returned as *APIError so callers can inspect the status code.
 func AzureRequest(method, url, accessToken string, body, out any) error {
 	var reqBody io.Reader
@@ -117,6 +117,16 @@ func GetUserID() (string, error) {
 
 func GetAccessToken() (string, error) {
 	out, err := exec.Command("az", "account", "get-access-token",
+		"--query", "accessToken", "-o", "tsv").Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
+func GetDevOpsAccessToken() (string, error) {
+	out, err := exec.Command("az", "account", "get-access-token",
+		"--resource", "499b84ac-1321-427f-aa17-267ca6975798",
 		"--query", "accessToken", "-o", "tsv").Output()
 	if err != nil {
 		return "", err

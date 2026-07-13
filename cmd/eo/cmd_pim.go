@@ -73,12 +73,7 @@ func principalLabel(resolved map[string]pim.Principal, id string) string {
 }
 
 func cmdPimApprove(args []string) error {
-	approveAll := false
-	for _, arg := range args {
-		if arg == "--all" {
-			approveAll = true
-		}
-	}
+	approveAll := hasFlag(args, "--all")
 	justification := "Approved via eo-cli"
 	if j := firstPositional(args); j != "" {
 		justification = j

@@ -9,8 +9,6 @@ import (
 var version = "dev"
 
 func main() {
-	printBanner()
-
 	if err := run(os.Args[1:]); err != nil {
 		fmt.Fprintln(os.Stderr, red("✗ ")+err.Error())
 		os.Exit(1)
@@ -30,6 +28,12 @@ func run(args []string) error {
 	case "version", "-v", "--version":
 		fmt.Printf("eo %s\n", version)
 		return nil
+	case "deploy":
+		if hasHelpFlag(args[1:]) {
+			printDeployHelp()
+			return nil
+		}
+		return cmdDeploy(args[1:])
 	case "pim":
 		if len(args) >= 2 && args[1] == "approve" {
 			if hasHelpFlag(args[2:]) {

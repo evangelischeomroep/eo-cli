@@ -38,6 +38,17 @@ func loadCreds(needUser bool) (*azureCreds, error) {
 	return creds, nil
 }
 
+func hasFlag(args []string, flags ...string) bool {
+	for _, arg := range args {
+		for _, f := range flags {
+			if arg == f {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func firstPositional(args []string) string {
 	for _, arg := range args {
 		if !strings.HasPrefix(arg, "--") {

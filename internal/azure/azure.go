@@ -96,42 +96,32 @@ func AzureRequest(method, url, accessToken string, body, out any) error {
 	return nil
 }
 
-func GetSubscriptionID() (string, error) {
-	out, err := exec.Command("az", "account", "list",
-		"--query", fmt.Sprintf("[?name=='%s'].id", SubscriptionName),
-		"-o", "tsv").Output()
+func azCLI(args ...string) (string, error) {
+	out, err := exec.Command("az", args...).Output()
 	if err != nil {
 		return "", err
 	}
 	return strings.TrimSpace(string(out)), nil
+}
+
+func GetSubscriptionID() (string, error) {
+	return azCLI("account", "list", "--query", fmt.Sprintf("[?name=='%s'].id", SubscriptionName), "-o", "tsv")
 }
 
 func GetUserID() (string, error) {
-	out, err := exec.Command("az", "ad", "signed-in-user", "show",
-		"--query", "id", "-o", "tsv").Output()
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(string(out)), nil
+	return azCLI("ad", "signed-in-user", "show", "--query", "id", "-o", "tsv")
 }
 
 func GetAccessToken() (string, error) {
-	out, err := exec.Command("az", "account", "get-access-token",
-		"--query", "accessToken", "-o", "tsv").Output()
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(string(out)), nil
+	return azCLI("account", "get-access-token", "--query", "accessToken", "-o", "tsv")
 }
 
 func GetDevOpsAccessToken() (string, error) {
-	out, err := exec.Command("az", "account", "get-access-token",
-		"--resource", "499b84ac-1321-427f-aa17-267ca6975798",
-		"--query", "accessToken", "-o", "tsv").Output()
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(string(out)), nil
+	return azCLI("account", "get-access-token", "--resource", "499b84ac-1321-427f-aa17-267ca6975798", "--query", "accessToken", "-o", "tsv")
+}
+
+func GetGraphAccessToken() (string, error) {
+	return azCLI("account", "get-access-token", "--resource", "https://graph.microsoft.com", "--query", "accessToken", "-o", "tsv")
 }
 
 // GenerateUUID returns a random RFC 4122 v4 UUID.

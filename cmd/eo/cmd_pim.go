@@ -1,13 +1,10 @@
 package main
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
-	"os"
-	"strconv"
-	"strings"
 
+	"github.com/charmbracelet/huh"
 	"github.com/evangelischeomroep/eo-cli/internal/azure"
 	"github.com/evangelischeomroep/eo-cli/internal/pim"
 )
@@ -99,18 +96,7 @@ func cmdPimApprove(args []string) error {
 
 	principals := resolvePrincipals(pending)
 
-	fmt.Println(bold(fmt.Sprintf("Found %d pending request(s):", len(pending))))
-	fmt.Println()
-	for i, r := range pending {
-		role := pim.RoleDisplayName(r.Properties.RoleDefinitionID)
-		who := principalLabel(principals, r.Properties.PrincipalID)
-		fmt.Printf("  %s %s\n", cyan(fmt.Sprintf("[%d]", i+1)), bold(role))
-		fmt.Printf("      %s %s\n", dim("Requester:"), who)
-		fmt.Printf("      %s    %s\n", dim("Reason:"), r.Properties.Justification)
-		fmt.Println()
-	}
-
-	toApprove, err := pickApprovals(pending, approveAll)
+	toApprove, err := pickApprovals(pending, principals, approveAll)
 	if err != nil {
 		return err
 	}
@@ -140,33 +126,38 @@ func cmdPimApprove(args []string) error {
 	return nil
 }
 
-func pickApprovals(pending []pim.ScheduleRequest, approveAll bool) ([]pim.ScheduleRequest, error) {
+func pickApprovals(pending []pim.ScheduleRequest, principals map[string]pim.Principal, approveAll bool) ([]pim.ScheduleRequest, error) {
 	if approveAll {
 		return pending, nil
 	}
 
-	fmt.Print(bold("› ") + "Enter numbers to approve (space-separated), or " + cyan("all") + ": ")
-	scanner := bufio.NewScanner(os.Stdin)
-	if !scanner.Scan() {
-		if err := scanner.Err(); err != nil {
-			return nil, fmt.Errorf("reading input: %w", err)
+	options := make([]huh.Option[int], len(pending))
+	for i, r := range pending {
+		role := pim.RoleDisplayName(r.Properties.RoleDefinitionID)
+		who := principalLabel(principals, r.Properties.PrincipalID)
+		label := fmt.Sprintf("%s — %s", role, who)
+		if r.Properties.Justification != "" {
+			label += "\n  " + dim(r.Properties.Justification)
 		}
-		return nil, nil
-	}
-	input := strings.TrimSpace(scanner.Text())
-
-	if strings.EqualFold(input, "all") {
-		return pending, nil
+		options[i] = huh.NewOption(label, i)
 	}
 
-	var picked []pim.ScheduleRequest
-	for _, part := range strings.Fields(input) {
-		n, err := strconv.Atoi(part)
-		if err != nil || n < 1 || n > len(pending) {
-			fmt.Println(yellow("  ⚠ ") + "Invalid selection: " + part)
-			continue
-		}
-		picked = append(picked, pending[n-1])
+	var selected []int
+	err := huh.NewForm(
+		huh.NewGroup(
+			huh.NewMultiSelect[int]().
+				Title("Select requests to approve").
+				Options(options...).
+				Value(&selected),
+		),
+	).Run()
+	if err != nil {
+		return nil, err
+	}
+
+	picked := make([]pim.ScheduleRequest, 0, len(selected))
+	for _, i := range selected {
+		picked = append(picked, pending[i])
 	}
 	return picked, nil
 }

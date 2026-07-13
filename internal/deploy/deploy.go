@@ -125,11 +125,13 @@ func IsTestStageCompleted(buildID int, accessToken string) (bool, error) {
 }
 
 type Approval struct {
-	ID     string `json:"id"`
-	Status string `json:"status"`
-	Run    struct {
-		ID int `json:"id"`
-	} `json:"run"`
+	ID       string `json:"id"`
+	Status   string `json:"status"`
+	Pipeline struct {
+		Owner struct {
+			ID int `json:"id"`
+		} `json:"owner"`
+	} `json:"pipeline"`
 }
 
 type approvalListResponse struct {
@@ -146,7 +148,7 @@ func GetPendingApprovals(buildID int, accessToken string) ([]Approval, error) {
 
 	var pending []Approval
 	for _, a := range result.Value {
-		if a.Status == "pending" && a.Run.ID == buildID {
+		if a.Status == "pending" && a.Pipeline.Owner.ID == buildID {
 			pending = append(pending, a)
 		}
 	}

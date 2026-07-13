@@ -15,9 +15,10 @@ func cmdDeploy(args []string) error {
 		return err
 	}
 	env := "test"
-	if len(args) > 0 {
+	if len(args) > 0 && !strings.HasPrefix(args[0], "--") {
 		env = args[0]
 	}
+
 	apps, err := deploy.ListFunctionApps(creds.subscriptionID, creds.accessToken, env)
 	if err != nil {
 		return err
@@ -127,10 +128,12 @@ func approveProd(buildID int, appName, devOpsToken string) error {
 	if len(approvals) == 0 {
 		return fmt.Errorf("no pending approval found")
 	}
-	for _, a := range approvals {
-		if err := deploy.ApproveDeployment(a.ID, devOpsToken); err != nil {
-			return fmt.Errorf("approval failed: %w", err)
-		}
+	if len(approvals) > 1 {
+		return fmt.Errorf("expected 1 pending approval but found %d — aborting to be safe", len(approvals))
+	}
+	fmt.Printf("     %s approving build %d for %s\n", dim("→"), buildID, bold(appName))
+	if err := deploy.ApproveDeployment(approvals[0].ID, devOpsToken); err != nil {
+		return fmt.Errorf("approval failed: %w", err)
 	}
 	return nil
 }

@@ -23,16 +23,8 @@ func cmdDeploy(args []string) error {
 		return err
 	}
 
-	deployAll := false
-	for _, arg := range args {
-		if arg == "--all" || arg == "-a" {
-			deployAll = true
-		}
-	}
-
 	selected := apps
-	if !deployAll {
-		var err error
+	if !hasFlag(args, "--all", "-a") {
 		selected, err = pickDeploys(apps)
 		if err != nil {
 			return err
@@ -52,6 +44,24 @@ func cmdDeploy(args []string) error {
 	pipelineByName := make(map[string]deploy.Pipeline)
 	for _, p := range pipelines {
 		pipelineByName[p.Name] = p
+	}
+
+	if env == "prod" {
+		var confirmed bool
+		err := huh.NewForm(
+			huh.NewGroup(
+				huh.NewConfirm().
+					Title(fmt.Sprintf("Deploy %d app(s) to production?", len(selected))).
+					Value(&confirmed),
+			),
+		).Run()
+		if err != nil {
+			return err
+		}
+		if !confirmed {
+			fmt.Println(dim("Cancelled."))
+			return nil
+		}
 	}
 
 	var failed int
@@ -82,17 +92,23 @@ func cmdDeploy(args []string) error {
 				failed++
 				continue
 			}
-		}
-		stageName, err := deploy.GetStageIdentifier(buildID, env, devOpsToken)
-		if err != nil {
-			fmt.Printf("  %s %s — %s\n", red("✗"), app.Name, dim(err.Error()))
-			failed++
-			continue
-		}
-		if err := deploy.RunStage(buildID, stageName, devOpsToken); err != nil {
-			fmt.Printf("  %s %s — stage failed\n     %s\n", red("✗"), app.Name, dim(err.Error()))
-			failed++
-			continue
+			if err := approveProd(buildID, app.Name, devOpsToken); err != nil {
+				fmt.Printf("  %s %s — %s\n", red("✗"), app.Name, dim(err.Error()))
+				failed++
+				continue
+			}
+		} else {
+			stageName, err := deploy.GetStageIdentifier(buildID, env, devOpsToken)
+			if err != nil {
+				fmt.Printf("  %s %s — %s\n", red("✗"), app.Name, dim(err.Error()))
+				failed++
+				continue
+			}
+			if err := deploy.RunStage(buildID, stageName, devOpsToken); err != nil {
+				fmt.Printf("  %s %s — stage failed\n     %s\n", red("✗"), app.Name, dim(err.Error()))
+				failed++
+				continue
+			}
 		}
 		fmt.Printf("  %s %s\n", green("✓"), app.Name)
 	}
@@ -103,9 +119,24 @@ func cmdDeploy(args []string) error {
 	return nil
 }
 
+func approveProd(buildID int, appName, devOpsToken string) error {
+	approvals, err := deploy.GetPendingApprovals(buildID, devOpsToken)
+	if err != nil {
+		return fmt.Errorf("could not fetch approvals: %w", err)
+	}
+	if len(approvals) == 0 {
+		return fmt.Errorf("no pending approval found")
+	}
+	for _, a := range approvals {
+		if err := deploy.ApproveDeployment(a.ID, devOpsToken); err != nil {
+			return fmt.Errorf("approval failed: %w", err)
+		}
+	}
+	return nil
+}
+
 func pickDeploys(apps []deploy.FunctionApp) ([]deploy.FunctionApp, error) {
 	names := make([]string, len(apps))
-
 	for i, app := range apps {
 		names[i] = app.Name
 	}
@@ -123,13 +154,13 @@ func pickDeploys(apps []deploy.FunctionApp) ([]deploy.FunctionApp, error) {
 		return nil, err
 	}
 
-	var picked []deploy.FunctionApp
+	byName := make(map[string]deploy.FunctionApp, len(apps))
 	for _, app := range apps {
-		for _, s := range selected {
-			if app.Name == s {
-				picked = append(picked, app)
-			}
-		}
+		byName[app.Name] = app
+	}
+	picked := make([]deploy.FunctionApp, 0, len(selected))
+	for _, name := range selected {
+		picked = append(picked, byName[name])
 	}
 	return picked, nil
 }

@@ -56,7 +56,7 @@ type buildListResponse struct {
 }
 
 func GetLatestBuild(pipelineID int, accessToken string) (int, error) {
-	url := fmt.Sprintf("%s/build/builds?definitions=%d&$top=1&api-version=7.1", devOpsBaseURL, pipelineID)
+	url := fmt.Sprintf("%s/build/builds?definitions=%d&$top=1&queryOrder=queueTimeDescending&api-version=7.1", devOpsBaseURL, pipelineID)
 
 	var result buildListResponse
 	if err := azure.AzureRequest("GET", url, accessToken, nil, &result); err != nil {
@@ -88,12 +88,20 @@ func getTimeline(buildID int, accessToken string) ([]timelineRecord, error) {
 	return result.Records, nil
 }
 
+var envSuffix = map[string]string{
+	"test": "_Test",
+	"prod": "_Production",
+}
+
 func GetStageIdentifier(buildID int, env, accessToken string) (string, error) {
 	records, err := getTimeline(buildID, accessToken)
 	if err != nil {
 		return "", err
 	}
-	suffix := "_" + strings.Title(env)
+	suffix, ok := envSuffix[env]
+	if !ok {
+		return "", fmt.Errorf("unknown env %q", env)
+	}
 	for _, r := range records {
 		if r.Type == "Stage" && strings.HasSuffix(r.Identifier, suffix) {
 			return r.Identifier, nil
@@ -107,12 +115,56 @@ func IsTestStageCompleted(buildID int, accessToken string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	suffix := envSuffix["test"]
 	for _, r := range records {
-		if r.Type == "Stage" && strings.HasSuffix(r.Identifier, "_Test") {
+		if r.Type == "Stage" && strings.HasSuffix(r.Identifier, suffix) {
 			return r.State == "completed", nil
 		}
 	}
 	return false, fmt.Errorf("no test stage found in build %d", buildID)
+}
+
+type Approval struct {
+	ID     string `json:"id"`
+	Status string `json:"status"`
+	Run    struct {
+		ID int `json:"id"`
+	} `json:"run"`
+}
+
+type approvalListResponse struct {
+	Value []Approval `json:"value"`
+}
+
+func GetPendingApprovals(buildID int, accessToken string) ([]Approval, error) {
+	url := fmt.Sprintf("%s/pipelines/approvals?api-version=7.1-preview.1", devOpsBaseURL)
+
+	var result approvalListResponse
+	if err := azure.AzureRequest("GET", url, accessToken, nil, &result); err != nil {
+		return nil, err
+	}
+
+	var pending []Approval
+	for _, a := range result.Value {
+		if a.Status == "pending" && a.Run.ID == buildID {
+			pending = append(pending, a)
+		}
+	}
+	return pending, nil
+}
+
+func ApproveDeployment(approvalID, accessToken string) error {
+	url := fmt.Sprintf("%s/pipelines/approvals?api-version=7.1-preview.1", devOpsBaseURL)
+
+	body := []map[string]interface{}{
+		{
+			"approvalId": approvalID,
+			"status":     "approved",
+			"comment":    "Approved via eo-cli",
+		},
+	}
+
+	return azure.AzureRequest("PATCH", url, accessToken, body, nil)
 }
 
 func RunStage(buildID int, stageName, accessToken string) error {

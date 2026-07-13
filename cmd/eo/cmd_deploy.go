@@ -1,6 +1,8 @@
 package main
 
 import (
+	_ "embed"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -8,6 +10,26 @@ import (
 	"github.com/evangelischeomroep/eo-cli/internal/azure"
 	"github.com/evangelischeomroep/eo-cli/internal/deploy"
 )
+
+//go:embed pipeline-map.json
+var pipelineMapData []byte
+
+func loadPipelineMap() map[string]string {
+	var m map[string]string
+	if err := json.Unmarshal(pipelineMapData, &m); err != nil {
+		return nil
+	}
+	return m
+}
+
+func pipelineName(baseName string, overrides map[string]string) string {
+	if overrides != nil {
+		if override, ok := overrides[baseName]; ok {
+			return override + "_release"
+		}
+	}
+	return baseName + "_release"
+}
 
 func cmdDeploy(args []string) error {
 	env := ""
@@ -57,6 +79,8 @@ func cmdDeploy(args []string) error {
 		pipelineByName[p.Name] = p
 	}
 
+	pipelineOverrides := loadPipelineMap()
+
 	if env == "prod" {
 		var confirmed bool
 		err := huh.NewForm(
@@ -78,10 +102,10 @@ func cmdDeploy(args []string) error {
 	var failed int
 	for _, app := range selected {
 		baseName := strings.TrimPrefix(app.Name, "app-"+env+"-")
-		pipelineName := baseName + "_release"
-		p, ok := pipelineByName[pipelineName]
+		pname := pipelineName(baseName, pipelineOverrides)
+		p, ok := pipelineByName[pname]
 		if !ok {
-			fmt.Printf("  %s %s — no pipeline found\n", red("✗"), app.Name)
+			fmt.Printf("  %s %s — no pipeline found (expected %q)\n", red("✗"), app.Name, pname)
 			failed++
 			continue
 		}

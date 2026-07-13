@@ -10,10 +10,6 @@ import (
 )
 
 func cmdDeploy(args []string) error {
-	creds, err := loadCreds(false)
-	if err != nil {
-		return err
-	}
 	env := ""
 	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
 		env = args[0]
@@ -26,6 +22,11 @@ func cmdDeploy(args []string) error {
 	}
 	if env != "test" && env != "prod" {
 		return fmt.Errorf("unknown environment %q — use test or prod", env)
+	}
+
+	creds, err := loadCreds(false)
+	if err != nil {
+		return err
 	}
 
 	apps, err := deploy.ListFunctionApps(creds.subscriptionID, creds.accessToken, env)

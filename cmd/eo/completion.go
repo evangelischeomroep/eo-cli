@@ -91,7 +91,7 @@ const bashCompletion = `_eo_completion() {
       COMPREPLY=($(compgen -W "deploy pim version completion help" -- "${cur}"))
       ;;
     deploy)
-      COMPREPLY=($(compgen -W "test prod --all -a" -- "${cur}"))
+      COMPREPLY=($(compgen -W "test prod" -- "${cur}"))
       ;;
     test|prod)
       COMPREPLY=($(compgen -W "--all -a" -- "${cur}"))

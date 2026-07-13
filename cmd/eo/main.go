@@ -9,8 +9,6 @@ import (
 var version = "dev"
 
 func main() {
-	printBanner()
-
 	if err := run(os.Args[1:]); err != nil {
 		fmt.Fprintln(os.Stderr, red("✗ ")+err.Error())
 		os.Exit(1)

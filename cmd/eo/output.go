@@ -14,7 +14,6 @@ const (
 	ansiGreen  = "\033[32m"
 	ansiYellow = "\033[33m"
 	ansiCyan   = "\033[36m"
-	ansiPurple = "\033[38;5;93m"
 )
 
 var useColor = shouldColor()
@@ -42,8 +41,7 @@ func dim(s string) string    { return paint(ansiDim, s) }
 func red(s string) string    { return paint(ansiRed, s) }
 func green(s string) string  { return paint(ansiGreen, s) }
 func yellow(s string) string { return paint(ansiYellow, s) }
-func cyan(s string) string   { return paint(ansiCyan, s) }
-func purple(s string) string { return paint(ansiPurple, s) }
+func cyan(s string) string { return paint(ansiCyan, s) }
 
 // pad right-pads s with spaces to width w.
 func pad(s string, w int) string {
@@ -51,23 +49,6 @@ func pad(s string, w int) string {
 		return s
 	}
 	return s + strings.Repeat(" ", w-len(s))
-}
-
-const banner = `
-    ______ ____     ______ __     ____
-   / ____// __ \   / ____// /    /  _/
-  / __/  / / / /  / /    / /     / /
- / /___ / /_/ /  / /___ / /___ _/ /
-/_____/ \____/   \____//_____//___/
-`
-
-func printBanner() {
-	if !useColor {
-		return
-	}
-	fmt.Println(purple(banner))
-	fmt.Println(dim("  Evangelische Omroep — developer CLI"))
-	fmt.Println()
 }
 
 // helpDoc builds a help page as a single string and prints it at once.

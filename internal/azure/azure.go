@@ -99,7 +99,11 @@ func AzureRequest(method, url, accessToken string, body, out any) error {
 func azCLI(args ...string) (string, error) {
 	out, err := exec.Command("az", args...).Output()
 	if err != nil {
-		return "", err
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) && len(exitErr.Stderr) > 0 {
+			return "", fmt.Errorf("az %s: %s", strings.Join(args, " "), strings.TrimSpace(string(exitErr.Stderr)))
+		}
+		return "", fmt.Errorf("az %s: %w", strings.Join(args, " "), err)
 	}
 	return strings.TrimSpace(string(out)), nil
 }

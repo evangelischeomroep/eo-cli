@@ -149,17 +149,17 @@ func approveProd(buildID int, appName, devOpsToken string) error {
 }
 
 func pickDeploys(apps []deploy.FunctionApp) ([]deploy.FunctionApp, error) {
-	names := make([]string, len(apps))
+	options := make([]huh.Option[int], len(apps))
 	for i, app := range apps {
-		names[i] = app.Name
+		options[i] = huh.NewOption(app.Name, i)
 	}
 
-	var selected []string
+	var selected []int
 	err := huh.NewForm(
 		huh.NewGroup(
-			huh.NewMultiSelect[string]().
+			huh.NewMultiSelect[int]().
 				Title("Select Function Apps to deploy").
-				Options(huh.NewOptions(names...)...).
+				Options(options...).
 				Value(&selected),
 		),
 	).Run()
@@ -167,13 +167,9 @@ func pickDeploys(apps []deploy.FunctionApp) ([]deploy.FunctionApp, error) {
 		return nil, err
 	}
 
-	byName := make(map[string]deploy.FunctionApp, len(apps))
-	for _, app := range apps {
-		byName[app.Name] = app
-	}
 	picked := make([]deploy.FunctionApp, 0, len(selected))
-	for _, name := range selected {
-		picked = append(picked, byName[name])
+	for _, i := range selected {
+		picked = append(picked, apps[i])
 	}
 	return picked, nil
 }

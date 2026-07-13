@@ -3,7 +3,6 @@ package pim
 import (
 	"fmt"
 	"net/http"
-	"os/exec"
 	"strings"
 
 	"github.com/evangelischeomroep/eo-cli/internal/azure"
@@ -34,13 +33,7 @@ func (p Principal) String() string {
 }
 
 func GetGraphAccessToken() (string, error) {
-	out, err := exec.Command("az", "account", "get-access-token",
-		"--resource", "https://graph.microsoft.com",
-		"--query", "accessToken", "-o", "tsv").Output()
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(string(out)), nil
+	return azure.GetGraphAccessToken()
 }
 
 type graphObject struct {

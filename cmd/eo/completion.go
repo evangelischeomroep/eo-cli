@@ -44,6 +44,7 @@ const zshCompletion = `_eo() {
     command)
       local -a commands
       commands=(
+        'deploy:Deploy Function Apps to test or prod'
         'pim:Activate the Contributor role for 8h'
         'version:Print the current version'
         'completion:Output shell completion script'
@@ -53,6 +54,15 @@ const zshCompletion = `_eo() {
       ;;
     args)
       case $words[2] in
+        deploy)
+          if (( CURRENT == 3 )); then
+            local -a envs
+            envs=('test:Deploy to test' 'prod:Deploy to production')
+            _describe 'environment' envs
+          else
+            _arguments '--all[Deploy all apps without selection]' '-a[Deploy all apps without selection]'
+          fi
+          ;;
         pim)
           local -a pim_cmds
           pim_cmds=('approve:List and approve pending PIM requests')
@@ -78,7 +88,13 @@ const bashCompletion = `_eo_completion() {
 
   case "${prev}" in
     eo)
-      COMPREPLY=($(compgen -W "pim version completion help" -- "${cur}"))
+      COMPREPLY=($(compgen -W "deploy pim version completion help" -- "${cur}"))
+      ;;
+    deploy)
+      COMPREPLY=($(compgen -W "test prod --all -a" -- "${cur}"))
+      ;;
+    test|prod)
+      COMPREPLY=($(compgen -W "--all -a" -- "${cur}"))
       ;;
     pim)
       COMPREPLY=($(compgen -W "approve" -- "${cur}"))

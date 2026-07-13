@@ -72,27 +72,47 @@ type timelineRecord struct {
 	ID         string `json:"id"`
 	Identifier string `json:"identifier"`
 	Type       string `json:"type"`
+	State      string `json:"state"`
 }
 
 type timeline struct {
 	Records []timelineRecord `json:"records"`
 }
 
-func GetStageIdentifier(buildID int, env, accessToken string) (string, error) {
+func getTimeline(buildID int, accessToken string) ([]timelineRecord, error) {
 	url := fmt.Sprintf("%s/build/builds/%d/timeline?api-version=7.1", devOpsBaseURL, buildID)
-
 	var result timeline
 	if err := azure.AzureRequest("GET", url, accessToken, nil, &result); err != nil {
+		return nil, err
+	}
+	return result.Records, nil
+}
+
+func GetStageIdentifier(buildID int, env, accessToken string) (string, error) {
+	records, err := getTimeline(buildID, accessToken)
+	if err != nil {
 		return "", err
 	}
-
 	suffix := "_" + strings.Title(env)
-	for _, r := range result.Records {
+	for _, r := range records {
 		if r.Type == "Stage" && strings.HasSuffix(r.Identifier, suffix) {
 			return r.Identifier, nil
 		}
 	}
 	return "", fmt.Errorf("no stage found for env %q in build %d", env, buildID)
+}
+
+func IsTestStageCompleted(buildID int, accessToken string) (bool, error) {
+	records, err := getTimeline(buildID, accessToken)
+	if err != nil {
+		return false, err
+	}
+	for _, r := range records {
+		if r.Type == "Stage" && strings.HasSuffix(r.Identifier, "_Test") {
+			return r.State == "completed", nil
+		}
+	}
+	return false, fmt.Errorf("no test stage found in build %d", buildID)
 }
 
 func RunStage(buildID int, stageName, accessToken string) error {

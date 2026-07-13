@@ -70,13 +70,26 @@ func cmdDeploy(args []string) error {
 			failed++
 			continue
 		}
+		if env == "prod" {
+			ok, err := deploy.IsTestStageCompleted(buildID, devOpsToken)
+			if err != nil {
+				fmt.Printf("  %s %s — %s\n", red("✗"), app.Name, dim(err.Error()))
+				failed++
+				continue
+			}
+			if !ok {
+				fmt.Printf("  %s %s — test stage not completed yet\n", red("✗"), app.Name)
+				failed++
+				continue
+			}
+		}
 		stageName, err := deploy.GetStageIdentifier(buildID, env, devOpsToken)
 		if err != nil {
 			fmt.Printf("  %s %s — %s\n", red("✗"), app.Name, dim(err.Error()))
 			failed++
 			continue
 		}
-if err := deploy.RunStage(buildID, stageName, devOpsToken); err != nil {
+		if err := deploy.RunStage(buildID, stageName, devOpsToken); err != nil {
 			fmt.Printf("  %s %s — stage failed\n     %s\n", red("✗"), app.Name, dim(err.Error()))
 			failed++
 			continue

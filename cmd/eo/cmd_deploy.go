@@ -17,7 +17,7 @@ var pipelineMapData []byte
 func loadPipelineMap() map[string]string {
 	var m map[string]string
 	if err := json.Unmarshal(pipelineMapData, &m); err != nil {
-		return nil
+		panic("pipeline-map.json is invalid: " + err.Error())
 	}
 	return m
 }

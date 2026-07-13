@@ -124,7 +124,7 @@ func GetAccessToken() (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
-func GetDevOpsActionToken() (string, error) {
+func GetDevOpsAccessToken() (string, error) {
 	out, err := exec.Command("az", "account", "get-access-token",
 		"--resource", "499b84ac-1321-427f-aa17-267ca6975798",
 		"--query", "accessToken", "-o", "tsv").Output()

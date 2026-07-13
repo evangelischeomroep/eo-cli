@@ -2,8 +2,10 @@ package main
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/charmbracelet/huh"
+	"github.com/evangelischeomroep/eo-cli/internal/azure"
 	"github.com/evangelischeomroep/eo-cli/internal/deploy"
 )
 
@@ -37,7 +39,54 @@ func cmdDeploy(args []string) error {
 		}
 	}
 
-	fmt.Println(selected)
+	devOpsToken, err := azure.GetDevOpsAccessToken()
+	if err != nil {
+		return fmt.Errorf("getting DevOps token: %w", err)
+	}
+
+	pipelines, err := deploy.ListPipelines(devOpsToken)
+	if err != nil {
+		return fmt.Errorf("listing pipelines: %w", err)
+	}
+
+	pipelineByName := make(map[string]deploy.Pipeline)
+	for _, p := range pipelines {
+		pipelineByName[p.Name] = p
+	}
+
+	var failed int
+	for _, app := range selected {
+		baseName := strings.TrimPrefix(app.Name, "app-"+env+"-")
+		pipelineName := baseName + "_release"
+		p, ok := pipelineByName[pipelineName]
+		if !ok {
+			fmt.Printf("  %s %s — no pipeline found\n", red("✗"), app.Name)
+			failed++
+			continue
+		}
+		buildID, err := deploy.GetLatestBuild(p.ID, devOpsToken)
+		if err != nil {
+			fmt.Printf("  %s %s\n     %s\n", red("✗"), app.Name, dim(err.Error()))
+			failed++
+			continue
+		}
+		stageName, err := deploy.GetStageIdentifier(buildID, env, devOpsToken)
+		if err != nil {
+			fmt.Printf("  %s %s — %s\n", red("✗"), app.Name, dim(err.Error()))
+			failed++
+			continue
+		}
+if err := deploy.RunStage(buildID, stageName, devOpsToken); err != nil {
+			fmt.Printf("  %s %s — stage failed\n     %s\n", red("✗"), app.Name, dim(err.Error()))
+			failed++
+			continue
+		}
+		fmt.Printf("  %s %s\n", green("✓"), app.Name)
+	}
+
+	if failed > 0 {
+		return fmt.Errorf("%d deployment(s) failed", failed)
+	}
 	return nil
 }
 

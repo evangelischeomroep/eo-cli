@@ -12,8 +12,10 @@ import (
 )
 
 const (
-	updateCheckURL = "https://api.github.com/repos/evangelischeomroep/eo-cli/releases/latest"
-	updateCheckTTL = 24 * time.Hour
+	updateCheckURL     = "https://api.github.com/repos/evangelischeomroep/eo-cli/releases/latest"
+	updateCheckTTL     = 24 * time.Hour
+	updateCheckTimeout = 400 * time.Millisecond
+	updateCheckWait    = 500 * time.Millisecond
 )
 
 type versionCache struct {
@@ -41,14 +43,14 @@ func printUpdateNotice(ch <-chan string, current string) {
 	var latest string
 	select {
 	case latest = <-ch:
-	case <-time.After(500 * time.Millisecond):
+	case <-time.After(updateCheckWait):
 		return
 	}
 	if latest == "" || !isNewer(latest, current) {
 		return
 	}
 	fmt.Fprintf(os.Stderr, "\n%s %s → %s\n", dim("update available:"), current, bold(latest))
-	fmt.Fprintf(os.Stderr, "%s\n", dim("  download: https://github.com/evangelischeomroep/eo-cli/releases/latest"))
+	fmt.Fprintf(os.Stderr, "%s\n", dim("  install instructions: https://github.com/evangelischeomroep/eo-cli/releases/latest"))
 }
 
 func isNewer(latest, current string) bool {
@@ -83,7 +85,7 @@ func fetchLatestVersion() (string, error) {
 		return cached.Version, nil
 	}
 
-	client := &http.Client{Timeout: 3 * time.Second}
+	client := &http.Client{Timeout: updateCheckTimeout}
 	req, err := http.NewRequest(http.MethodGet, updateCheckURL, nil)
 	if err != nil {
 		return "", err

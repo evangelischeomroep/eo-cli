@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -39,11 +40,34 @@ func printUpdateNotice(ch <-chan string, current string) {
 	case <-time.After(500 * time.Millisecond):
 		return
 	}
-	if latest == "" || normalize(latest) == normalize(current) {
+	if latest == "" || !isNewer(latest, current) {
 		return
 	}
 	fmt.Fprintf(os.Stderr, "\n%s %s → %s\n", dim("update available:"), current, bold(latest))
-	fmt.Fprintf(os.Stderr, "%s\n", dim("  curl -L https://github.com/evangelischeomroep/eo-cli/releases/latest/download/eo_darwin_arm64.tar.gz | tar xz && sudo mv eo /usr/local/bin/"))
+	fmt.Fprintf(os.Stderr, "%s\n", dim("  https://github.com/evangelischeomroep/eo-cli/releases/latest"))
+}
+
+func isNewer(latest, current string) bool {
+	l := parseSemver(normalize(latest))
+	c := parseSemver(normalize(current))
+	for i := range l {
+		if l[i] != c[i] {
+			return l[i] > c[i]
+		}
+	}
+	return false
+}
+
+func parseSemver(v string) [3]int {
+	parts := strings.SplitN(v, ".", 3)
+	var out [3]int
+	for i, p := range parts {
+		if i >= 3 {
+			break
+		}
+		out[i], _ = strconv.Atoi(p)
+	}
+	return out
 }
 
 func normalize(v string) string {
@@ -56,17 +80,30 @@ func fetchLatestVersion() (string, error) {
 	}
 
 	client := &http.Client{Timeout: 3 * time.Second}
-	resp, err := client.Get(updateCheckURL)
+	req, err := http.NewRequest(http.MethodGet, updateCheckURL, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("User-Agent", "eo-cli/"+version)
+
+	resp, err := client.Do(req)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("unexpected status %d", resp.StatusCode)
+	}
 
 	var release struct {
 		TagName string `json:"tag_name"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
 		return "", err
+	}
+	if release.TagName == "" {
+		return "", fmt.Errorf("empty tag_name in response")
 	}
 
 	writeCache(versionCache{Version: release.TagName, CheckedAt: time.Now()})

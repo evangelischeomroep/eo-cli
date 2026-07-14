@@ -9,7 +9,10 @@ import (
 var version = "dev"
 
 func main() {
-	if err := run(os.Args[1:]); err != nil {
+	updateCh := startUpdateCheck()
+	err := run(os.Args[1:])
+	printUpdateNotice(updateCh, version)
+	if err != nil {
 		fmt.Fprintln(os.Stderr, red("✗ ")+err.Error())
 		os.Exit(1)
 	}

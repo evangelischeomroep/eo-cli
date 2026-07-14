@@ -23,6 +23,10 @@ type versionCache struct {
 
 func startUpdateCheck() <-chan string {
 	ch := make(chan string, 1)
+	if version == "dev" {
+		ch <- ""
+		return ch
+	}
 	go func() {
 		latest, _ := fetchLatestVersion()
 		ch <- latest
@@ -44,7 +48,7 @@ func printUpdateNotice(ch <-chan string, current string) {
 		return
 	}
 	fmt.Fprintf(os.Stderr, "\n%s %s → %s\n", dim("update available:"), current, bold(latest))
-	fmt.Fprintf(os.Stderr, "%s\n", dim("  https://github.com/evangelischeomroep/eo-cli/releases/latest"))
+	fmt.Fprintf(os.Stderr, "%s\n", dim("  download: https://github.com/evangelischeomroep/eo-cli/releases/latest"))
 }
 
 func isNewer(latest, current string) bool {
@@ -88,11 +92,13 @@ func fetchLatestVersion() (string, error) {
 
 	resp, err := client.Do(req)
 	if err != nil {
+		writeCache(versionCache{CheckedAt: time.Now()})
 		return "", err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		writeCache(versionCache{CheckedAt: time.Now()})
 		return "", fmt.Errorf("unexpected status %d", resp.StatusCode)
 	}
 

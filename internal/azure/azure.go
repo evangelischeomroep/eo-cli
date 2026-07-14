@@ -49,7 +49,7 @@ func (e *APIError) Error() string {
 	return fmt.Sprintf("HTTP %d: %s", e.StatusCode, e.Body)
 }
 
-var httpClient = &http.Client{Timeout: 30 * time.Second}
+var httpClient = &http.Client{Timeout: 60 * time.Second}
 
 // AzureRequest performs an authenticated JSON call against Azure REST APIs. Non-2xx
 // responses are returned as *APIError so callers can inspect the status code.
@@ -74,7 +74,14 @@ func AzureRequest(method, url, accessToken string, body, out any) error {
 
 	res, err := httpClient.Do(req)
 	if err != nil {
-		return err
+		var timeoutErr interface{ Timeout() bool }
+		if errors.As(err, &timeoutErr) && timeoutErr.Timeout() {
+			return fmt.Errorf("Azure API request timed out")
+		}
+		if cause := errors.Unwrap(err); cause != nil {
+			return fmt.Errorf("Azure API request failed: %w", cause)
+		}
+		return fmt.Errorf("Azure API request failed")
 	}
 	defer res.Body.Close()
 

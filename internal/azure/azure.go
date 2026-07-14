@@ -79,7 +79,7 @@ func AzureRequest(method, url, accessToken string, body, out any) error {
 			return fmt.Errorf("Azure API request timed out")
 		}
 		if cause := errors.Unwrap(err); cause != nil {
-			return fmt.Errorf("Azure API request failed: %s", cause)
+			return fmt.Errorf("Azure API request failed: %w", cause)
 		}
 		return fmt.Errorf("Azure API request failed")
 	}

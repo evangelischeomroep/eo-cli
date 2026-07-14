@@ -106,9 +106,11 @@ func fetchLatestVersion() (string, error) {
 		TagName string `json:"tag_name"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		writeCache(versionCache{CheckedAt: time.Now()})
 		return "", err
 	}
 	if release.TagName == "" {
+		writeCache(versionCache{CheckedAt: time.Now()})
 		return "", fmt.Errorf("empty tag_name in response")
 	}
 
@@ -134,7 +136,8 @@ func readCache() (versionCache, error) {
 		return versionCache{}, err
 	}
 	var c versionCache
-	return c, json.Unmarshal(data, &c)
+	err = json.Unmarshal(data, &c)
+	return c, err
 }
 
 func writeCache(c versionCache) {

@@ -147,7 +147,9 @@ func cmdDeploy(args []string) error {
 			}
 			if watch {
 				stageName, err := deploy.GetStageIdentifier(buildID, env, devOpsToken)
-				if err == nil {
+				if err != nil {
+					fmt.Printf("     %s %s — skipping status watch: %s\n", dim("⚠"), app.Name, dim(err.Error()))
+				} else {
 					watching = append(watching, watchedDeploy{app.Name, buildID, stageName})
 				}
 			}

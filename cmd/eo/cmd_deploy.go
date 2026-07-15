@@ -165,7 +165,9 @@ func cmdDeploy(args []string) error {
 	}
 
 	if watch && len(watching) > 0 {
-		watchDeployments(watching, devOpsToken)
+		if err := watchDeployments(watching, devOpsToken); err != nil {
+			return err
+		}
 	}
 
 	if failed > 0 {
@@ -180,12 +182,13 @@ type watchedDeploy struct {
 	stageName string
 }
 
-func watchDeployments(deployments []watchedDeploy, devOpsToken string) {
+func watchDeployments(deployments []watchedDeploy, devOpsToken string) error {
 	fmt.Println(dim("\nWatching deployments..."))
 
 	lastState := make(map[string]string, len(deployments))
 	remaining := len(deployments)
 	consecutiveErrors := 0
+	var stageFailed int
 
 	printState := func(d watchedDeploy, state, result string) {
 		switch {
@@ -208,6 +211,9 @@ func watchDeployments(deployments []watchedDeploy, devOpsToken string) {
 		lastState[d.appName] = state
 		if state == deploy.StageStateCompleted {
 			remaining--
+			if result != deploy.StageResultSucceeded {
+				stageFailed++
+			}
 		}
 		printState(d, state, result)
 	}
@@ -224,7 +230,7 @@ func watchDeployments(deployments []watchedDeploy, devOpsToken string) {
 				consecutiveErrors++
 				if consecutiveErrors >= 5 {
 					fmt.Fprintf(os.Stderr, "  %s polling failed repeatedly — giving up\n", red("✗"))
-					return
+					return fmt.Errorf("polling failed repeatedly")
 				}
 				continue
 			}
@@ -236,9 +242,17 @@ func watchDeployments(deployments []watchedDeploy, devOpsToken string) {
 			printState(d, state, result)
 			if state == deploy.StageStateCompleted {
 				remaining--
+				if result != deploy.StageResultSucceeded {
+					stageFailed++
+				}
 			}
 		}
 	}
+
+	if stageFailed > 0 {
+		return fmt.Errorf("%d deployment(s) did not succeed", stageFailed)
+	}
+	return nil
 }
 
 func approveProd(buildID int, appName, devOpsToken string) error {

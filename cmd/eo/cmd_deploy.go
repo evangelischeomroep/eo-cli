@@ -110,6 +110,9 @@ func cmdDeploy(args []string) error {
 	}
 
 	watch := hasFlag(args, "--status", "-s")
+	if watch && env == "prod" {
+		return fmt.Errorf("--status is not supported for prod deployments")
+	}
 	var watching []watchedDeploy
 	var failed int
 
@@ -221,20 +224,16 @@ func watchDeployments(deployments []watchedDeploy, devOpsToken string) error {
 	for remaining > 0 {
 		time.Sleep(10 * time.Second)
 
+		intervalHadError := false
 		for _, d := range deployments {
 			if lastState[d.appName] == deploy.StageStateCompleted {
 				continue
 			}
 			state, result, err := deploy.GetStageStatus(d.buildID, d.stageName, devOpsToken)
 			if err != nil {
-				consecutiveErrors++
-				if consecutiveErrors >= 5 {
-					fmt.Fprintf(os.Stderr, "  %s polling failed repeatedly — giving up\n", red("✗"))
-					return fmt.Errorf("polling failed repeatedly")
-				}
+				intervalHadError = true
 				continue
 			}
-			consecutiveErrors = 0
 			if state == lastState[d.appName] {
 				continue
 			}
@@ -246,6 +245,15 @@ func watchDeployments(deployments []watchedDeploy, devOpsToken string) error {
 					stageFailed++
 				}
 			}
+		}
+		if intervalHadError {
+			consecutiveErrors++
+			if consecutiveErrors >= 5 {
+				fmt.Fprintf(os.Stderr, "  %s polling failed repeatedly — giving up\n", red("✗"))
+				return fmt.Errorf("polling failed repeatedly")
+			}
+		} else {
+			consecutiveErrors = 0
 		}
 	}
 

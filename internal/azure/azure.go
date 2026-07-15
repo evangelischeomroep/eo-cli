@@ -57,6 +57,8 @@ func (e *APIError) Error() string {
 
 var httpClient = &http.Client{Timeout: 60 * time.Second}
 
+// AzureRequest performs an authenticated JSON call against Azure REST APIs.
+// Non-2xx responses are returned as *APIError so callers can inspect the status code.
 func AzureRequest(method, url, accessToken string, body, out any) error {
 	var reqBody io.Reader
 	if body != nil {
@@ -139,6 +141,7 @@ func GetGraphAccessToken() (string, error) {
 	return azCLI("account", "get-access-token", "--resource", "https://graph.microsoft.com", "--query", "accessToken", "-o", "tsv")
 }
 
+// GenerateUUID returns a random RFC 4122 v4 UUID.
 func GenerateUUID() (string, error) {
 	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {

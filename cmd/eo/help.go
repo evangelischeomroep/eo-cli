@@ -59,7 +59,7 @@ func printDeployHelp() {
 	h.flag("test|prod", "Target environment (default: test)")
 	h.section("FLAGS")
 	h.flag("--all, -a", "Deploy all apps without interactive selection")
-	h.flag("--status, -s", "Watch deployment status until all apps complete (test only)")
+	h.flag("--status, -s", "Watch deployment status until all apps complete")
 	h.section("EXAMPLES")
 	h.example("Interactive selection for test", "eo deploy test")
 	h.example("Deploy all apps to test", "eo deploy test --all")

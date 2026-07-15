@@ -110,9 +110,6 @@ func cmdDeploy(args []string) error {
 	}
 
 	watch := hasFlag(args, "--status", "-s")
-	if watch && env == "prod" {
-		return fmt.Errorf("--status is not supported for prod deployments")
-	}
 	var watching []watchedDeploy
 	var failed int
 
@@ -147,6 +144,12 @@ func cmdDeploy(args []string) error {
 				fmt.Printf("  %s %s — %s\n", red("✗"), app.Name, dim(err.Error()))
 				failed++
 				continue
+			}
+			if watch {
+				stageName, err := deploy.GetStageIdentifier(buildID, env, devOpsToken)
+				if err == nil {
+					watching = append(watching, watchedDeploy{app.Name, buildID, stageName})
+				}
 			}
 		} else {
 			stageName, err := deploy.GetStageIdentifier(buildID, env, devOpsToken)

@@ -4,7 +4,9 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/huh"
 	"github.com/evangelischeomroep/eo-cli/internal/azure"
@@ -107,7 +109,10 @@ func cmdDeploy(args []string) error {
 		}
 	}
 
+	watch := hasFlag(args, "--status", "-s")
+	var watching []watchedDeploy
 	var failed int
+
 	for _, app := range selected {
 		baseName := strings.TrimPrefix(app.Name, "app-"+env+"-")
 		pname := pipelineName(baseName, pipelineOverrides)
@@ -140,6 +145,14 @@ func cmdDeploy(args []string) error {
 				failed++
 				continue
 			}
+			if watch {
+				stageName, err := deploy.GetStageIdentifier(buildID, env, devOpsToken)
+				if err != nil {
+					fmt.Printf("     %s %s — skipping status watch: %s\n", dim("⚠"), app.Name, dim(err.Error()))
+				} else {
+					watching = append(watching, watchedDeploy{app.Name, buildID, stageName})
+				}
+			}
 		} else {
 			stageName, err := deploy.GetStageIdentifier(buildID, env, devOpsToken)
 			if err != nil {
@@ -152,12 +165,105 @@ func cmdDeploy(args []string) error {
 				failed++
 				continue
 			}
+			if watch {
+				watching = append(watching, watchedDeploy{app.Name, buildID, stageName})
+			}
 		}
 		fmt.Printf("  %s %s\n", green("✓"), app.Name)
 	}
 
+	if watch && len(watching) > 0 {
+		if err := watchDeployments(watching, devOpsToken); err != nil {
+			return err
+		}
+	}
+
 	if failed > 0 {
 		return fmt.Errorf("%d deployment(s) failed", failed)
+	}
+	return nil
+}
+
+type watchedDeploy struct {
+	appName   string
+	buildID   int
+	stageName string
+}
+
+func watchDeployments(deployments []watchedDeploy, devOpsToken string) error {
+	fmt.Println(dim("\nWatching deployments..."))
+
+	lastState := make(map[string]string, len(deployments))
+	remaining := len(deployments)
+	consecutiveErrors := 0
+	var stageFailed int
+
+	printState := func(d watchedDeploy, state, result string) {
+		switch {
+		case state == deploy.StageStateCompleted && result == deploy.StageResultSucceeded:
+			fmt.Printf("  %s %s\n", green("✓"), d.appName)
+		case state == deploy.StageStateCompleted:
+			fmt.Printf("  %s %s — %s\n", red("✗"), d.appName, result)
+		case state == deploy.StageStateInProgress:
+			fmt.Printf("  %s %s — running\n", dim("⏳"), d.appName)
+		default:
+			fmt.Printf("  %s %s — pending\n", dim("·"), d.appName)
+		}
+	}
+
+	for _, d := range deployments {
+		state, result, err := deploy.GetStageStatus(d.buildID, d.stageName, devOpsToken)
+		if err != nil {
+			continue
+		}
+		lastState[d.appName] = state
+		if state == deploy.StageStateCompleted {
+			remaining--
+			if result != deploy.StageResultSucceeded {
+				stageFailed++
+			}
+		}
+		printState(d, state, result)
+	}
+
+	for remaining > 0 {
+		time.Sleep(10 * time.Second)
+
+		intervalHadError := false
+		for _, d := range deployments {
+			if lastState[d.appName] == deploy.StageStateCompleted {
+				continue
+			}
+			state, result, err := deploy.GetStageStatus(d.buildID, d.stageName, devOpsToken)
+			if err != nil {
+				intervalHadError = true
+				continue
+			}
+			if state == lastState[d.appName] {
+				continue
+			}
+			lastState[d.appName] = state
+			printState(d, state, result)
+			if state == deploy.StageStateCompleted {
+				remaining--
+				if result != deploy.StageResultSucceeded {
+					stageFailed++
+				}
+			}
+		}
+		if intervalHadError {
+			consecutiveErrors++
+			if consecutiveErrors >= 5 {
+				fmt.Fprintf(os.Stderr, "  %s polling failed repeatedly — giving up\n", red("✗"))
+				return fmt.Errorf("polling failed repeatedly")
+			}
+		} else {
+			consecutiveErrors = 0
+		}
+	}
+
+	if stageFailed > 0 {
+		return fmt.Errorf("%d deployment(s) did not succeed", stageFailed)
 	}
 	return nil
 }

@@ -37,6 +37,13 @@ func ListFunctionApps(subscriptionID, accessToken, env string) ([]FunctionApp, e
 
 const devOpsBaseURL = "https://dev.azure.com/evangelischeomroep/Apps%20and%20Services/_apis"
 
+const (
+	StageStatePending    = "pending"
+	StageStateInProgress = "inProgress"
+	StageStateCompleted  = "completed"
+	StageResultSucceeded = "succeeded"
+)
+
 func ListPipelines(accessToken string) ([]Pipeline, error) {
 	url := devOpsBaseURL + "/pipelines?api-version=7.1"
 
@@ -73,6 +80,7 @@ type timelineRecord struct {
 	Identifier string `json:"identifier"`
 	Type       string `json:"type"`
 	State      string `json:"state"`
+	Result     string `json:"result"`
 }
 
 type timeline struct {
@@ -167,6 +175,19 @@ func ApproveDeployment(approvalID, accessToken string) error {
 	}
 
 	return azure.AzureRequest("PATCH", url, accessToken, body, nil)
+}
+
+func GetStageStatus(buildID int, stageIdentifier, accessToken string) (state, result string, err error) {
+	records, err := getTimeline(buildID, accessToken)
+	if err != nil {
+		return "", "", err
+	}
+	for _, r := range records {
+		if r.Type == "Stage" && r.Identifier == stageIdentifier {
+			return r.State, r.Result, nil
+		}
+	}
+	return "", "", fmt.Errorf("stage %q not found in build %d", stageIdentifier, buildID)
 }
 
 func RunStage(buildID int, stageName, accessToken string) error {

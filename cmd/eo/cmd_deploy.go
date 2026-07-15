@@ -85,11 +85,16 @@ func cmdDeploy(args []string) error {
 	}
 
 	if env == "prod" {
+		appNames := make([]string, len(selected))
+		for i, app := range selected {
+			appNames[i] = "  • " + app.Name
+		}
 		var confirmed bool
 		err := huh.NewForm(
 			huh.NewGroup(
 				huh.NewConfirm().
 					Title(fmt.Sprintf("Deploy %d app(s) to production?", len(selected))).
+					Description(strings.Join(appNames, "\n")).
 					Value(&confirmed),
 			),
 		).Run()

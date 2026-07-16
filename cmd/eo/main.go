@@ -47,7 +47,7 @@ func run(args []string) error {
 		}
 		if len(args) >= 2 && args[1] == "status" {
 			if hasHelpFlag(args[2:]) {
-				printPimHelp()
+				printPimStatusHelp()
 				return nil
 			}
 			return cmdPimStatus()

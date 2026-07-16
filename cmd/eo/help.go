@@ -91,6 +91,19 @@ func printPimHelp() {
 	h.print()
 }
 
+func printPimStatusHelp() {
+	var h helpDoc
+	h.line(bold("eo pim status") + dim(" — Show Contributor role status"))
+	h.blank()
+	h.line("  Shows whether the Contributor role is currently active on the")
+	h.line("  " + cyan(azure.SubscriptionName) + " subscription and how much time remains.")
+	h.section("USAGE")
+	h.line("  eo pim status")
+	h.section("EXAMPLES")
+	h.example("", "eo pim status")
+	h.print()
+}
+
 func printPimApproveHelp() {
 	var h helpDoc
 	h.line(bold("eo pim approve") + dim(" — Approve pending PIM requests"))

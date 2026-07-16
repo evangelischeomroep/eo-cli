@@ -105,7 +105,7 @@ func GetContributorRoleExpiry(subscriptionID, userID, accessToken string) (time.
 		if r.Properties.PrincipalID == userID &&
 			r.Properties.Status == "Active" &&
 			strings.HasSuffix(r.Properties.RoleDefinitionID, suffix) {
-			t, err := time.Parse(time.RFC3339, r.Properties.EndDateTime)
+			t, err := time.Parse(time.RFC3339Nano, r.Properties.EndDateTime)
 			if err != nil {
 				return time.Time{}, fmt.Errorf("parsing expiry time: %w", err)
 			}

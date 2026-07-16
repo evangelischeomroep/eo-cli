@@ -27,6 +27,7 @@ func printMainHelp() {
 	h.cmd("pim", "Activate the Contributor role for 8h")
 	h.cmd("pim approve", "List and approve pending PIM requests")
 	h.cmd("pim status", "Show if your Contributor role is active")
+	h.cmd("whoami", "Show the current Azure user and subscription")
 	h.cmd("version", "Print the current version")
 	h.cmd("completion", "Output shell completion script")
 	h.cmd("help", "Show help for a command")
@@ -69,6 +70,19 @@ func printDeployHelp() {
 	h.section("NOTES")
 	h.line("  • Prod deployments require the test stage to be completed first")
 	h.line("  • Prod will ask for confirmation before approving")
+	h.print()
+}
+
+func printWhoamiHelp() {
+	var h helpDoc
+	h.line(bold("eo whoami") + dim(" — Show the current Azure user and subscription"))
+	h.blank()
+	h.line("  Displays the name, email, and active subscription of the currently")
+	h.line("  logged-in Azure account.")
+	h.section("USAGE")
+	h.line("  eo whoami")
+	h.section("EXAMPLES")
+	h.example("", "eo whoami")
 	h.print()
 }
 

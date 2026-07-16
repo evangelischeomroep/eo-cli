@@ -77,6 +77,14 @@ eo pim approve --all
 eo pim approve --all "sprint review batch"
 ```
 
+### `eo whoami`
+
+Show the current Azure user (name, email) and active subscription.
+
+```bash
+eo whoami
+```
+
 ### `eo completion`
 
 Output a shell completion script so Tab autocompletes commands.

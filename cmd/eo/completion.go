@@ -46,6 +46,7 @@ const zshCompletion = `_eo() {
       commands=(
         'deploy:Deploy Function Apps to test or prod'
         'pim:Activate the Contributor role for 8h'
+        'whoami:Show the current Azure user and subscription'
         'version:Print the current version'
         'completion:Output shell completion script'
         'help:Show help for a command'
@@ -88,7 +89,7 @@ const bashCompletion = `_eo_completion() {
 
   case "${prev}" in
     eo)
-      COMPREPLY=($(compgen -W "deploy pim version completion help" -- "${cur}"))
+      COMPREPLY=($(compgen -W "deploy pim whoami version completion help" -- "${cur}"))
       ;;
     deploy)
       COMPREPLY=($(compgen -W "test prod" -- "${cur}"))

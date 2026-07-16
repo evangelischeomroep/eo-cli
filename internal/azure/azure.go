@@ -133,6 +133,31 @@ func GetAccessToken() (string, error) {
 	return azCLI("account", "get-access-token", "--query", "accessToken", "-o", "tsv")
 }
 
+type AccountInfo struct {
+	Name  string `json:"name"`
+	ID    string `json:"id"`
+	State string `json:"state"`
+	User  struct {
+		Name string `json:"name"`
+	} `json:"user"`
+}
+
+func GetAccountInfo() (AccountInfo, error) {
+	out, err := azCLI("account", "show", "-o", "json")
+	if err != nil {
+		return AccountInfo{}, err
+	}
+	var info AccountInfo
+	if err := json.Unmarshal([]byte(out), &info); err != nil {
+		return AccountInfo{}, fmt.Errorf("parsing account info: %w", err)
+	}
+	return info, nil
+}
+
+func GetSignedInUserDisplayName() (string, error) {
+	return azCLI("ad", "signed-in-user", "show", "--query", "displayName", "-o", "tsv")
+}
+
 func GetDevOpsAccessToken() (string, error) {
 	return azCLI("account", "get-access-token", "--resource", "499b84ac-1321-427f-aa17-267ca6975798", "--query", "accessToken", "-o", "tsv")
 }

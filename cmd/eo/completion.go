@@ -11,6 +11,8 @@ func cmdCompletion(shell string) error {
 		fmt.Print(zshCompletion)
 	case "bash":
 		fmt.Print(bashCompletion)
+	case "fish":
+		fmt.Print(fishCompletion)
 	default:
 		fmt.Fprintln(os.Stderr, bold("eo completion")+" — Output shell completion script")
 		fmt.Fprintln(os.Stderr)
@@ -18,7 +20,7 @@ func cmdCompletion(shell string) error {
 		fmt.Fprintln(os.Stderr, "  eo completion <shell>")
 		fmt.Fprintln(os.Stderr)
 		fmt.Fprintln(os.Stderr, bold("SHELLS"))
-		fmt.Fprintln(os.Stderr, "  zsh   bash")
+		fmt.Fprintln(os.Stderr, "  zsh   bash   fish")
 		fmt.Fprintln(os.Stderr)
 		fmt.Fprintln(os.Stderr, bold("SETUP"))
 		fmt.Fprintln(os.Stderr, dim("  # zsh — add to ~/.zshrc:"))
@@ -26,8 +28,11 @@ func cmdCompletion(shell string) error {
 		fmt.Fprintln(os.Stderr)
 		fmt.Fprintln(os.Stderr, dim("  # bash — add to ~/.bashrc:"))
 		fmt.Fprintln(os.Stderr, `  source <(eo completion bash)`)
+		fmt.Fprintln(os.Stderr)
+		fmt.Fprintln(os.Stderr, dim("  # fish — save to the completions directory:"))
+		fmt.Fprintln(os.Stderr, `  eo completion fish > ~/.config/fish/completions/eo.fish`)
 		if shell != "" {
-			return fmt.Errorf("unknown shell %q — supported: zsh, bash", shell)
+			return fmt.Errorf("unknown shell %q — supported: zsh, bash, fish", shell)
 		}
 	}
 	return nil
@@ -71,7 +76,7 @@ const zshCompletion = `_eo() {
           ;;
         completion)
           local -a shells
-          shells=('zsh' 'bash')
+          shells=('zsh' 'bash' 'fish')
           _describe 'shell' shells
           ;;
       esac
@@ -101,10 +106,29 @@ const bashCompletion = `_eo_completion() {
       COMPREPLY=($(compgen -W "approve status" -- "${cur}"))
       ;;
     completion)
-      COMPREPLY=($(compgen -W "zsh bash" -- "${cur}"))
+      COMPREPLY=($(compgen -W "zsh bash fish" -- "${cur}"))
       ;;
   esac
 }
 
 complete -F _eo_completion eo
+`
+
+const fishCompletion = `complete -c eo -f
+
+complete -c eo -n '__fish_use_subcommand' -a deploy -d 'Deploy Function Apps to test or prod'
+complete -c eo -n '__fish_use_subcommand' -a pim -d 'Activate the Contributor role for 8h'
+complete -c eo -n '__fish_use_subcommand' -a whoami -d 'Show the current Azure user and subscription'
+complete -c eo -n '__fish_use_subcommand' -a version -d 'Print the current version'
+complete -c eo -n '__fish_use_subcommand' -a completion -d 'Output shell completion script'
+complete -c eo -n '__fish_use_subcommand' -a help -d 'Show help for a command'
+
+complete -c eo -n '__fish_seen_subcommand_from deploy; and not __fish_seen_subcommand_from test prod' -a test -d 'Deploy to test'
+complete -c eo -n '__fish_seen_subcommand_from deploy; and not __fish_seen_subcommand_from test prod' -a prod -d 'Deploy to production'
+complete -c eo -n '__fish_seen_subcommand_from test prod' -s a -l all -d 'Deploy all apps without selection'
+
+complete -c eo -n '__fish_seen_subcommand_from pim; and not __fish_seen_subcommand_from approve status' -a approve -d 'List and approve pending PIM requests'
+complete -c eo -n '__fish_seen_subcommand_from pim; and not __fish_seen_subcommand_from approve status' -a status -d 'Show if your Contributor role is active'
+
+complete -c eo -n '__fish_seen_subcommand_from completion' -a 'zsh bash fish'
 `

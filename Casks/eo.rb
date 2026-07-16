@@ -43,7 +43,7 @@ cask "eo" do
   end
   generate_completions_from_executable "eo", "completion",
                                        shell_parameter_format: :arg,
-                                       shells:                 [:bash, :zsh]
+                                       shells:                 [:bash, :fish, :zsh]
 
   # No zap stanza required
 end

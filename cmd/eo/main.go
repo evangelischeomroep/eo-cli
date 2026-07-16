@@ -58,6 +58,10 @@ func run(args []string) error {
 		}
 		return cmdPimRequest(args[1:])
 	case "whoami":
+		if hasHelpFlag(args[1:]) {
+			printWhoamiHelp()
+			return nil
+		}
 		return cmdWhoami()
 	case "completion":
 		shell := ""

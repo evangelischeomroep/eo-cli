@@ -73,6 +73,19 @@ func printDeployHelp() {
 	h.print()
 }
 
+func printWhoamiHelp() {
+	var h helpDoc
+	h.line(bold("eo whoami") + dim(" — Show the current Azure user and subscription"))
+	h.blank()
+	h.line("  Displays the name, email, and active subscription of the currently")
+	h.line("  logged-in Azure account.")
+	h.section("USAGE")
+	h.line("  eo whoami")
+	h.section("EXAMPLES")
+	h.example("", "eo whoami")
+	h.print()
+}
+
 func printPimHelp() {
 	var h helpDoc
 	h.line(bold("eo pim") + dim(" — Activate the Contributor role on Azure"))

@@ -30,6 +30,9 @@ func run(args []string) error {
 		return nil
 	case "version", "-v", "--version":
 		fmt.Printf("eo %s\n", version)
+		if version != "dev" {
+			fmt.Println(dim("https://github.com/evangelischeomroep/eo-cli/releases/tag/" + version))
+		}
 		return nil
 	case "deploy":
 		if hasHelpFlag(args[1:]) {

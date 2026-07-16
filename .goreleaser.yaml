@@ -40,7 +40,6 @@ homebrew_casks:
       executable: eo
       args:
         - completion
-      shell_parameter_format: arg
       shells:
         - bash
         - fish

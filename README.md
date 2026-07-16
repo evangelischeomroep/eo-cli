@@ -4,7 +4,7 @@ Developer CLI for Evangelische Omroep. Currently focused on Azure PIM: activatin
 
 ## Installation
 
-### macOS (recommended)
+### Homebrew (macOS and Linux, recommended)
 
 Install with Homebrew:
 

@@ -3,11 +3,35 @@ package main
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/charmbracelet/huh"
 	"github.com/evangelischeomroep/eo-cli/internal/azure"
 	"github.com/evangelischeomroep/eo-cli/internal/pim"
 )
+
+func cmdPimStatus() error {
+	creds, err := loadCreds(true)
+	if err != nil {
+		return err
+	}
+
+	expiry, err := pim.GetContributorRoleExpiry(creds.subscriptionID, creds.userID, creds.accessToken)
+	if err != nil {
+		return err
+	}
+
+	remaining := time.Until(expiry)
+	if expiry.IsZero() || remaining <= 0 {
+		fmt.Println(red("✗ ") + "Contributor role is not active.")
+		return nil
+	}
+
+	h := int(remaining.Hours())
+	m := int(remaining.Minutes()) % 60
+	fmt.Printf("%s Contributor role is active — expires in %s\n", green("✓"), bold(fmt.Sprintf("%dh %dm", h, m)))
+	return nil
+}
 
 func cmdPimRequest(args []string) error {
 	fmt.Println(bold("→ Activating Contributor role on ") + cyan(azure.SubscriptionName) + bold(" (8h)"))

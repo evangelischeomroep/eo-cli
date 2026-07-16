@@ -65,7 +65,7 @@ const zshCompletion = `_eo() {
           ;;
         pim)
           local -a pim_cmds
-          pim_cmds=('approve:List and approve pending PIM requests')
+          pim_cmds=('approve:List and approve pending PIM requests' 'status:Show if your Contributor role is active')
           _describe 'pim command' pim_cmds
           ;;
         completion)
@@ -97,7 +97,7 @@ const bashCompletion = `_eo_completion() {
       COMPREPLY=($(compgen -W "--all -a" -- "${cur}"))
       ;;
     pim)
-      COMPREPLY=($(compgen -W "approve" -- "${cur}"))
+      COMPREPLY=($(compgen -W "approve status" -- "${cur}"))
       ;;
     completion)
       COMPREPLY=($(compgen -W "zsh bash" -- "${cur}"))

@@ -26,6 +26,7 @@ func printMainHelp() {
 	h.cmd("deploy", "Deploy Function Apps to test or prod")
 	h.cmd("pim", "Activate the Contributor role for 8h")
 	h.cmd("pim approve", "List and approve pending PIM requests")
+	h.cmd("pim status", "Show if your Contributor role is active")
 	h.cmd("version", "Print the current version")
 	h.cmd("completion", "Output shell completion script")
 	h.cmd("help", "Show help for a command")
@@ -87,6 +88,19 @@ func printPimHelp() {
 	h.section("NOTES")
 	h.line("  • Activation lasts 8 hours from the moment of activation")
 	h.line("  • If the role is already active you get a warning, no error")
+	h.print()
+}
+
+func printPimStatusHelp() {
+	var h helpDoc
+	h.line(bold("eo pim status") + dim(" — Show Contributor role status"))
+	h.blank()
+	h.line("  Shows whether the Contributor role is currently active on the")
+	h.line("  " + cyan(azure.SubscriptionName) + " subscription and how much time remains.")
+	h.section("USAGE")
+	h.line("  eo pim status")
+	h.section("EXAMPLES")
+	h.example("", "eo pim status")
 	h.print()
 }
 

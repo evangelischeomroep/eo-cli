@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/evangelischeomroep/eo-cli/internal/azure"
 )
@@ -70,4 +72,48 @@ func RequestContributorRole(subscriptionID, userID, accessToken, justification s
 		return err
 	}
 	return nil
+}
+
+type roleAssignmentScheduleInstance struct {
+	Properties struct {
+		PrincipalID      string `json:"principalId"`
+		RoleDefinitionID string `json:"roleDefinitionId"`
+		EndDateTime      string `json:"endDateTime"`
+		Status           string `json:"status"`
+	} `json:"properties"`
+}
+
+type roleAssignmentScheduleInstancesResponse struct {
+	Value    []roleAssignmentScheduleInstance `json:"value"`
+	NextLink string                           `json:"nextLink"`
+}
+
+// GetContributorRoleExpiry returns the expiry time of the active Contributor role
+// assignment for the given user. Returns a zero time.Time when the role is not active.
+func GetContributorRoleExpiry(subscriptionID, userID, accessToken string) (time.Time, error) {
+	next := fmt.Sprintf(
+		"%s/subscriptions/%s/providers/Microsoft.Authorization/roleAssignmentScheduleInstances?api-version=%s&$filter=atScope()",
+		azure.ArmBaseURL, subscriptionID, azure.ScheduleAPIVersion,
+	)
+	suffix := "/roleDefinitions/" + azure.ContributorRoleID
+
+	for next != "" {
+		var page roleAssignmentScheduleInstancesResponse
+		if err := azure.AzureRequest(http.MethodGet, next, accessToken, nil, &page); err != nil {
+			return time.Time{}, err
+		}
+		for _, r := range page.Value {
+			if r.Properties.PrincipalID == userID &&
+				r.Properties.Status == "Active" &&
+				strings.HasSuffix(r.Properties.RoleDefinitionID, suffix) {
+				t, err := time.Parse(time.RFC3339Nano, r.Properties.EndDateTime)
+				if err != nil {
+					return time.Time{}, fmt.Errorf("parsing expiry time: %w", err)
+				}
+				return t, nil
+			}
+		}
+		next = page.NextLink
+	}
+	return time.Time{}, nil
 }

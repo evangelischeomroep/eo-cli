@@ -43,6 +43,7 @@ homebrew_casks:
       shell_parameter_format: arg
       shells:
         - bash
+        - fish
         - zsh
     hooks:
       post:

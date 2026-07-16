@@ -116,7 +116,14 @@ source <(eo completion zsh)
 source <(eo completion bash)
 ```
 
-After reloading your shell (`source ~/.zshrc` or open a new terminal), Tab completion works:
+**fish** — save to Fish's completions directory:
+
+```fish
+mkdir -p ~/.config/fish/completions
+eo completion fish > ~/.config/fish/completions/eo.fish
+```
+
+After reloading your shell, Tab completion works:
 
 ```
 eo p<Tab>        → eo pim

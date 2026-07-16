@@ -39,7 +39,7 @@ cask "eo" do
   binary "eo"
 
   postflight do
-    system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/eo"] if OS.mac?
+    system_command "/usr/bin/xattr", args: ["-d", "com.apple.quarantine", "#{staged_path}/eo"] if OS.mac?
   end
   generate_completions_from_executable "eo", "completion",
                                        shell_parameter_format: :arg,

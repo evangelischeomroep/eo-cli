@@ -26,6 +26,7 @@ func printMainHelp() {
 	h.cmd("deploy", "Deploy Function Apps to test or prod")
 	h.cmd("pim", "Activate the Contributor role for 8h")
 	h.cmd("pim approve", "List and approve pending PIM requests")
+	h.cmd("pim status", "Show if your Contributor role is active")
 	h.cmd("version", "Print the current version")
 	h.cmd("completion", "Output shell completion script")
 	h.cmd("help", "Show help for a command")

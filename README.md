@@ -54,6 +54,14 @@ eo pim
 eo pim "deploying release 2.4"
 ```
 
+### `eo pim status`
+
+Check whether your Contributor role is currently active and how long it has left.
+
+```bash
+eo pim status
+```
+
 ### `eo pim approve`
 
 List pending PIM requests and approve them.
@@ -89,7 +97,7 @@ After reloading your shell (`source ~/.zshrc` or open a new terminal), Tab compl
 
 ```
 eo p<Tab>        → eo pim
-eo pim <Tab>     → eo pim approve
+eo pim <Tab>     → eo pim approve / eo pim status
 ```
 
 ### `eo version`

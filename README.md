@@ -6,6 +6,21 @@ Developer CLI for Evangelische Omroep. Currently focused on Azure PIM: activatin
 
 ### macOS (recommended)
 
+Install with Homebrew:
+
+```bash
+brew tap evangelischeomroep/eo-cli https://github.com/evangelischeomroep/eo-cli
+brew install --cask evangelischeomroep/eo-cli/eo
+```
+
+Homebrew also installs the Azure CLI dependency and shell completions. Sign in before using `eo`:
+
+```bash
+az login
+```
+
+### macOS (manual)
+
 Download the correct binary from the [Releases page](https://github.com/evangelischeomroep/eo-cli/releases/latest):
 
 | Mac | File |
@@ -134,4 +149,4 @@ git tag v1.2.3
 git push origin v1.2.3
 ```
 
-GitHub Actions will automatically build binaries for macOS (Intel + ARM) and Linux and publish a GitHub Release.
+GitHub Actions will automatically build binaries for macOS (Intel + ARM) and Linux, publish a GitHub Release, and update `Casks/eo.rb` for Homebrew installations.

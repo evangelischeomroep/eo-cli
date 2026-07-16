@@ -28,6 +28,34 @@ archives:
 checksum:
   name_template: checksums.txt
 
+homebrew_casks:
+  - name: eo
+    binaries:
+      - eo
+    homepage: https://github.com/evangelischeomroep/eo-cli
+    description: Developer CLI for Evangelische Omroep
+    dependencies:
+      - formula: azure-cli
+    generate_completions_from_executable:
+      executable: eo
+      args:
+        - completion
+      shell_parameter_format: arg
+      shells:
+        - bash
+        - zsh
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/eo"]
+          end
+    skip_upload: auto
+    repository:
+      owner: evangelischeomroep
+      name: eo-cli
+      token: "{{ .Env.GITHUB_TOKEN }}"
+
 changelog:
   sort: asc
   filters:

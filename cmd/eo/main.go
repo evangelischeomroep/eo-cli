@@ -57,6 +57,8 @@ func run(args []string) error {
 			return nil
 		}
 		return cmdPimRequest(args[1:])
+	case "whoami":
+		return cmdWhoami()
 	case "completion":
 		shell := ""
 		if len(args) >= 2 {

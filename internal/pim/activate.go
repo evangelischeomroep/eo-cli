@@ -87,6 +87,8 @@ type roleAssignmentScheduleInstancesResponse struct {
 	Value []roleAssignmentScheduleInstance `json:"value"`
 }
 
+// GetContributorRoleExpiry returns the expiry time of the active Contributor role
+// assignment for the given user. Returns a zero time.Time when the role is not active.
 func GetContributorRoleExpiry(subscriptionID, userID, accessToken string) (time.Time, error) {
 	url := fmt.Sprintf(
 		"%s/subscriptions/%s/providers/Microsoft.Authorization/roleAssignmentScheduleInstances?api-version=%s&$filter=atScope()",

@@ -84,33 +84,36 @@ type roleAssignmentScheduleInstance struct {
 }
 
 type roleAssignmentScheduleInstancesResponse struct {
-	Value []roleAssignmentScheduleInstance `json:"value"`
+	Value    []roleAssignmentScheduleInstance `json:"value"`
+	NextLink string                           `json:"nextLink"`
 }
 
 // GetContributorRoleExpiry returns the expiry time of the active Contributor role
 // assignment for the given user. Returns a zero time.Time when the role is not active.
 func GetContributorRoleExpiry(subscriptionID, userID, accessToken string) (time.Time, error) {
-	url := fmt.Sprintf(
+	next := fmt.Sprintf(
 		"%s/subscriptions/%s/providers/Microsoft.Authorization/roleAssignmentScheduleInstances?api-version=%s&$filter=atScope()",
 		azure.ArmBaseURL, subscriptionID, azure.ScheduleAPIVersion,
 	)
-
-	var result roleAssignmentScheduleInstancesResponse
-	if err := azure.AzureRequest(http.MethodGet, url, accessToken, nil, &result); err != nil {
-		return time.Time{}, err
-	}
-
 	suffix := "/roleDefinitions/" + azure.ContributorRoleID
-	for _, r := range result.Value {
-		if r.Properties.PrincipalID == userID &&
-			r.Properties.Status == "Active" &&
-			strings.HasSuffix(r.Properties.RoleDefinitionID, suffix) {
-			t, err := time.Parse(time.RFC3339Nano, r.Properties.EndDateTime)
-			if err != nil {
-				return time.Time{}, fmt.Errorf("parsing expiry time: %w", err)
-			}
-			return t, nil
+
+	for next != "" {
+		var page roleAssignmentScheduleInstancesResponse
+		if err := azure.AzureRequest(http.MethodGet, next, accessToken, nil, &page); err != nil {
+			return time.Time{}, err
 		}
+		for _, r := range page.Value {
+			if r.Properties.PrincipalID == userID &&
+				r.Properties.Status == "Active" &&
+				strings.HasSuffix(r.Properties.RoleDefinitionID, suffix) {
+				t, err := time.Parse(time.RFC3339Nano, r.Properties.EndDateTime)
+				if err != nil {
+					return time.Time{}, fmt.Errorf("parsing expiry time: %w", err)
+				}
+				return t, nil
+			}
+		}
+		next = page.NextLink
 	}
 	return time.Time{}, nil
 }

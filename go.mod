@@ -4,7 +4,7 @@ go 1.25.8
 
 require (
 	charm.land/huh/v2 v2.0.3
-	golang.org/x/sync v0.19.0
+	golang.org/x/sync v0.22.0
 )
 
 require (

@@ -168,7 +168,33 @@ and secret names are constants in
 [`internal/pim/notify.go`](./internal/pim/notify.go), and `eo pim --help`
 prints them.
 
-Sending a notification needs read access to that secret — `Key Vault Secrets
+### Setup
+
+Find the vault that should hold the secret, or confirm none exists yet:
+
+```bash
+az keyvault list --query "[].name" -o tsv
+```
+
+If the name differs from `WebhookVaultName` in
+[`internal/pim/notify.go`](./internal/pim/notify.go), change the constant. If no
+vault exists yet, create one:
+
+```bash
+az keyvault create --name <vault> --resource-group <rg> --location westeurope
+```
+
+Then store the webhook URL:
+
+```bash
+az keyvault secret set --vault-name <vault> --name slack-pim-webhook --value <webhook-url>
+```
+
+`az keyvault secret set` does not create the vault. Against a vault that does
+not exist it fails with a urllib3 DNS error on `<vault>.vault.azure.net`, which
+looks like a network problem but means the vault name is wrong.
+
+Sending a notification needs read access to the secret — `Key Vault Secrets
 User` on an RBAC vault, or a `get` secret permission on an access-policy vault.
 Check which model the vault uses before granting:
 

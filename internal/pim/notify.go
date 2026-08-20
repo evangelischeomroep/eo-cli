@@ -2,6 +2,7 @@ package pim
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/evangelischeomroep/eo-cli/internal/azure"
 	"github.com/evangelischeomroep/eo-cli/internal/slack"
@@ -42,12 +43,37 @@ func slackLabel(p Principal) string {
 func SlackWebhookURL() (string, error) {
 	url, err := azure.GetKeyVaultSecret(WebhookVaultName, WebhookSecretName)
 	if err != nil {
-		return "", err
+		return "", webhookLookupError(err)
 	}
 	if url == "" {
 		return "", fmt.Errorf("secret %q in vault %q is empty", WebhookSecretName, WebhookVaultName)
 	}
 	return url, nil
+}
+
+// webhookLookupError names what actually went wrong. The az CLI reports the
+// three cases that matter here as multi-line Python plumbing — a missing vault
+// arrives as a urllib3 DNS stack — which says nothing to someone who just
+// wanted to know why Slack stayed quiet.
+func webhookLookupError(err error) error {
+	msg := err.Error()
+	switch {
+	case strings.Contains(msg, "Failed to resolve"), strings.Contains(msg, "NameResolutionError"):
+		return fmt.Errorf("Key Vault %q does not exist, or is unreachable from this network", WebhookVaultName)
+	case strings.Contains(msg, "SecretNotFound"):
+		return fmt.Errorf("vault %q has no secret %q yet", WebhookVaultName, WebhookSecretName)
+	case strings.Contains(msg, "Forbidden"), strings.Contains(msg, "AccessDenied"):
+		return fmt.Errorf("no read access to secret %q in vault %q", WebhookSecretName, WebhookVaultName)
+	}
+	return fmt.Errorf("reading secret %q from vault %q: %s", WebhookSecretName, WebhookVaultName, firstLine(msg))
+}
+
+// firstLine keeps an az error to one terminal line; the rest is a stack trace.
+func firstLine(s string) string {
+	if i := strings.IndexByte(s, '\n'); i >= 0 {
+		return strings.TrimSpace(s[:i])
+	}
+	return strings.TrimSpace(s)
 }
 
 // ActivationRequestedMessage announces that someone asked for the Contributor

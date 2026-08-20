@@ -1,6 +1,7 @@
 package pim
 
 import (
+	"errors"
 	"strings"
 	"testing"
 )
@@ -88,5 +89,55 @@ func TestActivationRequestedMessageEscapesJustification(t *testing.T) {
 	}
 	if !strings.Contains(reason, "&lt;b&gt; &amp; &lt;i&gt;") {
 		t.Errorf("justification escaped incorrectly: %q", reason)
+	}
+}
+
+func TestWebhookLookupError(t *testing.T) {
+	tests := []struct {
+		name string
+		az   string
+		want string
+	}{
+		{
+			// What az actually prints when the vault does not exist.
+			name: "missing vault",
+			az: "az keyvault secret show --vault-name kv-prod-eo-cli: ERROR: HTTPSConnectionPool(" +
+				"host='kv-prod-eo-cli.vault.azure.net', port=443): Max retries exceeded (Caused by " +
+				"NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x103eda030>: " +
+				"Failed to resolve 'kv-prod-eo-cli.vault.azure.net' ([Errno 8] nodename nor servname " +
+				"provided, or not known)\"))",
+			want: `Key Vault "kv-prod-eo-cli" does not exist, or is unreachable from this network`,
+		},
+		{
+			name: "missing secret",
+			az:   "ERROR: (SecretNotFound) A secret with (name/id) slack-pim-webhook was not found in this key vault.",
+			want: `vault "kv-prod-eo-cli" has no secret "slack-pim-webhook" yet`,
+		},
+		{
+			name: "no access",
+			az:   "ERROR: (Forbidden) Caller is not authorized to perform action on resource.",
+			want: `no read access to secret "slack-pim-webhook" in vault "kv-prod-eo-cli"`,
+		},
+		{
+			name: "anything else keeps only the first line",
+			az:   "ERROR: something unexpected\n  File \"/opt/az/lib/foo.py\", line 12\n    raise\n",
+			want: `reading secret "slack-pim-webhook" from vault "kv-prod-eo-cli": ERROR: something unexpected`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := webhookLookupError(errors.New(tt.az)).Error()
+			if got != tt.want {
+				t.Errorf("webhookLookupError()\n got: %s\nwant: %s", got, tt.want)
+			}
+		})
+	}
+}
+
+// The message a user sees must not carry az's multi-line plumbing.
+func TestWebhookLookupErrorIsSingleLine(t *testing.T) {
+	multiline := "ERROR: boom\nTraceback (most recent call last):\n  File \"x.py\"\n"
+	if got := webhookLookupError(errors.New(multiline)).Error(); strings.Contains(got, "\n") {
+		t.Errorf("error spans multiple lines: %q", got)
 	}
 }

@@ -53,6 +53,7 @@ go install github.com/evangelischeomroep/eo-cli/cmd/eo@latest
 - [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli) installed and logged in (`az login`)
 - Access to the _EO Studio Digitaal_ subscription
 - For `pim approve`: you must be an approver on the relevant PIM policy
+- For the Slack notification on `eo pim`: `Get` permission on the Key Vault secret holding the webhook URL (see [Slack notifications](#slack-notifications))
 
 ## Usage
 
@@ -62,12 +63,22 @@ eo <command> [flags] [arguments]
 
 ### `eo pim`
 
-Activate the Contributor role for 8 hours.
+Activate the Contributor role for 8 hours. This creates a PIM request and posts
+it to Slack, so an approver knows there is something waiting:
 
 ```bash
 eo pim
 eo pim "deploying release 2.4"
 ```
+
+> :lock: **Bob Mulder** (bob.mulder@eo.nl) requests the **Contributor** role on **EO Studio Digitaal** for 8h.
+>
+> **Reason**
+> deploying release 2.4
+>
+> <sub>Approve with `eo pim approve` or in [Privileged Identity Management](https://entra.microsoft.com/#view/Microsoft_Azure_PIMCommon/ApprovalMenuBlade/~/azurerbac)</sub>
+
+If the role is already active no request is made, so nothing is posted.
 
 ### `eo pim status`
 
@@ -144,6 +155,36 @@ eo version
 eo --help
 eo pim --help
 eo pim approve --help
+```
+
+## Slack notifications
+
+`eo pim` posts each new request to a Slack [incoming webhook](https://api.slack.com/messaging/webhooks).
+
+The webhook URL is a secret and this repository is public, so it is neither
+committed nor baked into the released binaries. Instead the CLI reads it from
+Key Vault using the Azure credentials you are already signed in with. The vault
+and secret names are constants in
+[`internal/pim/notify.go`](./internal/pim/notify.go), and `eo pim --help`
+prints them.
+
+Sending a notification needs read access to that secret — `Key Vault Secrets
+User` on an RBAC vault, or a `get` secret permission on an access-policy vault.
+Check which model the vault uses before granting:
+
+```bash
+az keyvault show --name <vault> --query properties.enableRbacAuthorization
+```
+
+The notification is best effort: without access to the secret, or when Slack is
+unreachable, `eo pim` still activates the role and only reports that the
+notification was skipped. It never fails the command.
+
+To move the notifications to another channel, replace the secret rather than
+changing the code:
+
+```bash
+az keyvault secret set --vault-name <vault> --name <secret> --value <webhook-url>
 ```
 
 ## Releasing a new version

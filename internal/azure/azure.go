@@ -162,6 +162,17 @@ func GetDevOpsAccessToken() (string, error) {
 	return azCLI("account", "get-access-token", "--resource", "499b84ac-1321-427f-aa17-267ca6975798", "--query", "accessToken", "-o", "tsv")
 }
 
+// GetKeyVaultSecret reads a secret's value from an Azure Key Vault. Requires
+// Get permission on the vault's secrets for the signed-in user.
+func GetKeyVaultSecret(vaultName, secretName string) (string, error) {
+	return azCLI("keyvault", "secret", "show",
+		"--vault-name", vaultName,
+		"--name", secretName,
+		"--query", "value",
+		"-o", "tsv",
+	)
+}
+
 func GetGraphAccessToken() (string, error) {
 	return azCLI("account", "get-access-token", "--resource", "https://graph.microsoft.com", "--query", "accessToken", "-o", "tsv")
 }

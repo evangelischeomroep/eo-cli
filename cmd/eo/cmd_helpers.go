@@ -51,6 +51,39 @@ func loadCreds(needUser bool) (*azureCreds, error) {
 	return &azureCreds{subscriptionID: subID, accessToken: token, userID: userID}, nil
 }
 
+type signedInUser struct {
+	DisplayName  string
+	Email        string
+	Subscription string
+}
+
+// getSignedInUser resolves the logged-in Azure identity. On error the returned
+// struct still holds whatever did resolve, so callers that only decorate output
+// can degrade instead of giving up.
+func getSignedInUser() (signedInUser, error) {
+	var user signedInUser
+	var g errgroup.Group
+
+	g.Go(func() error {
+		account, err := azure.GetAccountInfo()
+		if err != nil {
+			return fmt.Errorf("getting account info: %w", err)
+		}
+		user.Email = account.User.Name
+		user.Subscription = account.Name
+		return nil
+	})
+	g.Go(func() (err error) {
+		user.DisplayName, err = azure.GetSignedInUserDisplayName()
+		if err != nil {
+			return fmt.Errorf("getting display name: %w", err)
+		}
+		return nil
+	})
+
+	return user, g.Wait()
+}
+
 func hasFlag(args []string, flags ...string) bool {
 	for _, arg := range args {
 		for _, f := range flags {

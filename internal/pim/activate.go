@@ -10,6 +10,13 @@ import (
 	"github.com/evangelischeomroep/eo-cli/internal/azure"
 )
 
+const (
+	// ActivationDuration is how long RequestContributorRole activates for, as an
+	// ISO-8601 duration. ActivationDurationLabel is the same window for humans.
+	ActivationDuration      = "PT8H"
+	ActivationDurationLabel = "8h"
+)
+
 type RequestBody struct {
 	Properties Properties `json:"properties"`
 }
@@ -33,8 +40,8 @@ type Expiration struct {
 }
 
 // RequestContributorRole activates the Contributor role on the given
-// subscription for 8 hours. Returns ErrRoleAlreadyActive if the role is
-// already active.
+// subscription for ActivationDuration. Returns ErrRoleAlreadyActive if the
+// role is already active.
 func RequestContributorRole(subscriptionID, userID, accessToken, justification string) error {
 	uuid, err := azure.GenerateUUID()
 	if err != nil {
@@ -53,7 +60,7 @@ func RequestContributorRole(subscriptionID, userID, accessToken, justification s
 			ScheduleInfo: ScheduleInfo{
 				Expiration: Expiration{
 					Type:     "AfterDuration",
-					Duration: "PT8H",
+					Duration: ActivationDuration,
 				},
 			},
 		},

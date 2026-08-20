@@ -170,29 +170,22 @@ prints them.
 
 ### Setup
 
-Find the vault that should hold the secret, or confirm none exists yet:
+Store or replace the webhook URL — `eo pim --help` prints the vault and secret
+it reads, and they are the `WebhookVaultName` / `WebhookSecretName` constants in
+[`internal/pim/notify.go`](./internal/pim/notify.go):
 
 ```bash
-az keyvault list --query "[].name" -o tsv
-```
-
-If the name differs from `WebhookVaultName` in
-[`internal/pim/notify.go`](./internal/pim/notify.go), change the constant. If no
-vault exists yet, create one:
-
-```bash
-az keyvault create --name <vault> --resource-group <rg> --location westeurope
-```
-
-Then store the webhook URL:
-
-```bash
-az keyvault secret set --vault-name <vault> --name slack-pim-webhook --value <webhook-url>
+az keyvault secret set --vault-name <vault> --name <secret> --value <webhook-url>
 ```
 
 `az keyvault secret set` does not create the vault. Against a vault that does
 not exist it fails with a urllib3 DNS error on `<vault>.vault.azure.net`, which
-looks like a network problem but means the vault name is wrong.
+reads like a network problem but means the name is wrong. List what you can see
+with:
+
+```bash
+az keyvault list --query "[].name" -o tsv
+```
 
 Sending a notification needs read access to the secret — `Key Vault Secrets
 User` on an RBAC vault, or a `get` secret permission on an access-policy vault.

@@ -13,7 +13,7 @@ const (
 	// URL. The URL itself is a secret and cannot live here: eo-cli is a public
 	// repository and its releases are public binaries, so a committed or
 	// ldflags-injected URL would be readable by anyone.
-	WebhookVaultName  = "kv-prod-eo-cli"
+	WebhookVaultName  = "kv-eonl-shared-001"
 	WebhookSecretName = "slack-pim-webhook"
 
 	// ApprovalPortalURL is the PIM "Approve requests" blade for Azure resource

@@ -2,6 +2,7 @@ package pim
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -101,27 +102,27 @@ func TestWebhookLookupError(t *testing.T) {
 		{
 			// What az actually prints when the vault does not exist.
 			name: "missing vault",
-			az: "az keyvault secret show --vault-name kv-prod-eo-cli: ERROR: HTTPSConnectionPool(" +
-				"host='kv-prod-eo-cli.vault.azure.net', port=443): Max retries exceeded (Caused by " +
-				"NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x103eda030>: " +
-				"Failed to resolve 'kv-prod-eo-cli.vault.azure.net' ([Errno 8] nodename nor servname " +
-				"provided, or not known)\"))",
-			want: `Key Vault "kv-prod-eo-cli" does not exist, or is unreachable from this network`,
+			az: fmt.Sprintf("az keyvault secret show --vault-name %[1]s: ERROR: HTTPSConnectionPool("+
+				"host='%[1]s.vault.azure.net', port=443): Max retries exceeded (Caused by "+
+				"NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x103eda030>: "+
+				"Failed to resolve '%[1]s.vault.azure.net' ([Errno 8] nodename nor servname "+
+				"provided, or not known)\"))", WebhookVaultName),
+			want: fmt.Sprintf("Key Vault %q does not exist, or is unreachable from this network", WebhookVaultName),
 		},
 		{
 			name: "missing secret",
-			az:   "ERROR: (SecretNotFound) A secret with (name/id) slack-pim-webhook was not found in this key vault.",
-			want: `vault "kv-prod-eo-cli" has no secret "slack-pim-webhook" yet`,
+			az:   fmt.Sprintf("ERROR: (SecretNotFound) A secret with (name/id) %s was not found in this key vault.", WebhookSecretName),
+			want: fmt.Sprintf("vault %q has no secret %q yet", WebhookVaultName, WebhookSecretName),
 		},
 		{
 			name: "no access",
 			az:   "ERROR: (Forbidden) Caller is not authorized to perform action on resource.",
-			want: `no read access to secret "slack-pim-webhook" in vault "kv-prod-eo-cli"`,
+			want: fmt.Sprintf("no read access to secret %q in vault %q", WebhookSecretName, WebhookVaultName),
 		},
 		{
 			name: "anything else keeps only the first line",
 			az:   "ERROR: something unexpected\n  File \"/opt/az/lib/foo.py\", line 12\n    raise\n",
-			want: `reading secret "slack-pim-webhook" from vault "kv-prod-eo-cli": ERROR: something unexpected`,
+			want: fmt.Sprintf("reading secret %q from vault %q: ERROR: something unexpected", WebhookSecretName, WebhookVaultName),
 		},
 	}
 	for _, tt := range tests {

@@ -195,6 +195,18 @@ Check which model the vault uses before granting:
 az keyvault show --name <vault> --query properties.enableRbacAuthorization
 ```
 
+On an access-policy vault, granting is itself a management-plane write, so
+activate Contributor first and use `eo pim` before it can notify:
+
+```bash
+eo pim
+az keyvault set-policy --name <vault> --secret-permissions get --upn <user@eo.nl>
+```
+
+Read access covers the whole vault under both models, not one secret. In a
+shared vault that means every secret it holds, so give the team a vault of its
+own if that is too much.
+
 The notification is best effort: without access to the secret, or when Slack is
 unreachable, `eo pim` still activates the role and only reports that the
 notification was skipped. It never fails the command.

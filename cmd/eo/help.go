@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/evangelischeomroep/eo-cli/internal/azure"
+	"github.com/evangelischeomroep/eo-cli/internal/pim"
 )
 
 func hasHelpFlag(args []string) bool {
@@ -24,7 +25,7 @@ func printMainHelp() {
 	h.line("  eo <command> [flags] [arguments]")
 	h.section("COMMANDS")
 	h.cmd("deploy", "Deploy Function Apps to test or prod")
-	h.cmd("pim", "Activate the Contributor role for 8h")
+	h.cmd("pim", "Activate the Contributor role for "+pim.ActivationDurationLabel)
 	h.cmd("pim approve", "List and approve pending PIM requests")
 	h.cmd("pim status", "Show if your Contributor role is active")
 	h.cmd("whoami", "Show the current Azure user and subscription")
@@ -42,6 +43,7 @@ func printMainHelp() {
 	h.line("  • Azure CLI (az) installed and logged in")
 	h.line(fmt.Sprintf("  • Access to the %q subscription", azure.SubscriptionName))
 	h.line("  • For approvals: you must be an approver on the relevant PIM policy")
+	h.line("  • For Slack notifications: Get access to the " + pim.WebhookVaultName + " vault secrets")
 	h.section("ENVIRONMENT")
 	h.flag("NO_COLOR", "Disable colored output when set")
 	h.blank()
@@ -91,7 +93,8 @@ func printPimHelp() {
 	h.line(bold("eo pim") + dim(" — Activate the Contributor role on Azure"))
 	h.blank()
 	h.line("  Activates the Contributor role on the " + cyan(azure.SubscriptionName) + " subscription for")
-	h.line("  8 hours. The optional reason is stored in the Azure PIM audit log.")
+	h.line("  " + pim.ActivationDurationLabel + ". The optional reason lands in the Azure PIM audit log and in a")
+	h.line("  Slack message, so an approver can pick the request up.")
 	h.section("USAGE")
 	h.line("  eo pim [reason]")
 	h.section("ARGUMENTS")
@@ -100,8 +103,13 @@ func printPimHelp() {
 	h.example("", "eo pim")
 	h.example("", `eo pim "deploying release 2.4"`)
 	h.section("NOTES")
-	h.line("  • Activation lasts 8 hours from the moment of activation")
-	h.line("  • If the role is already active you get a warning, no error")
+	h.line("  • Activation lasts " + pim.ActivationDurationLabel + " from the moment of activation")
+	h.line("  • If the role is already active you get a warning, no error —")
+	h.line("    no request is made, so nothing is posted to Slack")
+	h.line("  • The Slack message names you and links to " + cyan("eo pim approve"))
+	h.line("  • The webhook URL comes from the " + cyan(pim.WebhookSecretName) + " secret in the")
+	h.line("    " + cyan(pim.WebhookVaultName) + " Key Vault. Without Get access on it the")
+	h.line("    activation still succeeds and only the notification is skipped")
 	h.print()
 }
 

@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"charm.land/huh/v2"
+	"golang.org/x/sync/errgroup"
+
 	"github.com/evangelischeomroep/eo-cli/internal/azure"
 	"github.com/evangelischeomroep/eo-cli/internal/pim"
 )
@@ -34,8 +36,10 @@ func cmdPimStatus() error {
 }
 
 func cmdPimRequest(args []string) error {
-	fmt.Println(bold("→ Activating Contributor role on ") + cyan(azure.SubscriptionName) + bold(" (8h)"))
+	fmt.Println(bold("→ Activating Contributor role on ") + cyan(azure.SubscriptionName) + bold(" ("+pim.ActivationDurationLabel+")"))
 	fmt.Println()
+
+	notify := startNotifyLookup()
 
 	creds, err := loadCreds(true)
 	if err != nil {
@@ -50,13 +54,63 @@ func cmdPimRequest(args []string) error {
 	err = pim.RequestContributorRole(creds.subscriptionID, creds.userID, creds.accessToken, justification)
 	switch {
 	case errors.Is(err, azure.ErrRoleAlreadyActive):
+		// No request was created, so there is nothing for an approver to act on.
 		fmt.Println(yellow("⚠ ") + "Contributor role is already active — nothing to do.")
 		return nil
 	case err != nil:
 		return err
 	}
 	fmt.Println(green("✓ ") + "Contributor role activated.")
+
+	notifySlack(<-notify, justification)
 	return nil
+}
+
+// pimNotification carries what the Slack message needs, gathered up front.
+type pimNotification struct {
+	requester  pim.Principal
+	webhookURL string
+	webhookErr error
+}
+
+// startNotifyLookup resolves the requester and the webhook URL in the
+// background, so their az round-trips overlap with the activation instead of
+// being added to it.
+func startNotifyLookup() <-chan pimNotification {
+	ch := make(chan pimNotification, 1)
+	go func() {
+		var n pimNotification
+		var g errgroup.Group
+
+		g.Go(func() (err error) {
+			n.webhookURL, err = pim.SlackWebhookURL()
+			return err
+		})
+		g.Go(func() error {
+			// Best effort: a partial identity still names the requester.
+			user, _ := getSignedInUser()
+			n.requester = pim.Principal{DisplayName: user.DisplayName, Email: user.Email}
+			return nil
+		})
+
+		n.webhookErr = g.Wait()
+		ch <- n
+	}()
+	return ch
+}
+
+// notifySlack tells the team a request is waiting. The role is already
+// requested by the time this runs, so nothing here may fail the command.
+func notifySlack(n pimNotification, justification string) {
+	if n.webhookErr != nil {
+		fmt.Println(dim("  Slack notification skipped: " + n.webhookErr.Error()))
+		return
+	}
+	if err := pim.NotifyActivationRequested(n.webhookURL, n.requester, justification); err != nil {
+		fmt.Println(yellow("⚠ ") + dim("Slack notification failed: "+err.Error()))
+		return
+	}
+	fmt.Println(dim("  Slack notified — approvers can run ") + cyan("eo pim approve"))
 }
 
 // resolvePrincipals collects the unique principal IDs from the pending

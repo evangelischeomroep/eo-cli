@@ -1,10 +1,10 @@
 module github.com/evangelischeomroep/eo-cli
 
-go 1.25.8
+go 1.26.0
 
 require (
 	charm.land/huh/v2 v2.0.3
-	golang.org/x/sync v0.19.0
+	golang.org/x/sync v0.23.0
 )
 
 require (

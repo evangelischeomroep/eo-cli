@@ -44,17 +44,26 @@ homebrew_casks:
         - bash
         - fish
         - zsh
-    hooks:
-      post:
-        install: |
-          if OS.mac?
-            system_command "/usr/bin/xattr", args: ["-d", "com.apple.quarantine", "#{staged_path}/eo"]
-          end
+    # GoReleaser can't emit the modern `postflight_steps` stanza yet
+    # (goreleaser/goreleaser#6873), and the old `postflight` block it does
+    # emit is deprecated on current Homebrew, so it's written by hand here
+    # via custom_block instead. `chdir: "."` resolves to the staged path.
+    custom_block: |
+      postflight_steps do
+        on_macos do
+          run "/usr/bin/xattr", args: ["-d", "com.apple.quarantine", "eo"], chdir: "."
+        end
+      end
     skip_upload: auto
     repository:
       owner: evangelischeomroep
       name: eo-cli
       token: "{{ .Env.GITHUB_TOKEN }}"
+      # The default branch is protected by a ruleset requiring PRs, so push
+      # the cask update to its own branch and open a PR instead of pushing
+      # straight to main.
+      pull_request:
+        enabled: true
 
 changelog:
   sort: asc

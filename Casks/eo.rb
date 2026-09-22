@@ -3,24 +3,23 @@ cask "eo" do
   version "0.1.10"
 
   on_macos do
-    on_intel do
-      sha256 "5d4a0015c3b33ada81a5e684bc4c0d42e8731aeededbdb96705eeeae2477920c"
-      url "https://github.com/evangelischeomroep/eo-cli/releases/download/v#{version}/eo_darwin_amd64.tar.gz"
-    end
     on_arm do
       sha256 "2a0f32807b15207790b63aff5dffcc397d26763a7603a348d116def70e94031a"
       url "https://github.com/evangelischeomroep/eo-cli/releases/download/v#{version}/eo_darwin_arm64.tar.gz"
     end
-  end
-
-  on_linux do
     on_intel do
-      sha256 "0d69316c35a9a9aeb88f5a62546303e8c5b396abf5ce38ad0c9f83e5bf0ae380"
-      url "https://github.com/evangelischeomroep/eo-cli/releases/download/v#{version}/eo_linux_amd64.tar.gz"
+      sha256 "5d4a0015c3b33ada81a5e684bc4c0d42e8731aeededbdb96705eeeae2477920c"
+      url "https://github.com/evangelischeomroep/eo-cli/releases/download/v#{version}/eo_darwin_amd64.tar.gz"
     end
+  end
+  on_linux do
     on_arm do
       sha256 "449f79323dafa2f8f61582bd5ed76e00334e41eae298ad6eb68c9684ccc5f845"
       url "https://github.com/evangelischeomroep/eo-cli/releases/download/v#{version}/eo_linux_arm64.tar.gz"
+    end
+    on_intel do
+      sha256 "0d69316c35a9a9aeb88f5a62546303e8c5b396abf5ce38ad0c9f83e5bf0ae380"
+      url "https://github.com/evangelischeomroep/eo-cli/releases/download/v#{version}/eo_linux_amd64.tar.gz"
     end
   end
 
@@ -37,12 +36,14 @@ cask "eo" do
   ]
 
   binary "eo"
-
-  postflight do
-    system_command "/usr/bin/xattr", args: ["-d", "com.apple.quarantine", "#{staged_path}/eo"] if OS.mac?
-  end
   generate_completions_from_executable "eo", "completion",
                                        shells: [:bash, :fish, :zsh]
+
+  postflight_steps do
+    on_macos do
+      run "/usr/bin/xattr", args: ["-d", "com.apple.quarantine", "eo"], chdir: "."
+    end
+  end
 
   # No zap stanza required
 end

@@ -64,6 +64,18 @@ func run(args []string) error {
 			return nil
 		}
 		return cmdPimRequest(args[1:])
+	case "ask":
+		if askWantsHelp(args[1:]) {
+			printAskHelp()
+			return nil
+		}
+		return cmdAsk(args[1:])
+	case "mcp":
+		if hasHelpFlag(args[1:]) {
+			printMcpHelp()
+			return nil
+		}
+		return cmdMCP(args[1:])
 	case "whoami":
 		if hasHelpFlag(args[1:]) {
 			printWhoamiHelp()

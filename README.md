@@ -1,6 +1,20 @@
-# eo-cli
+<img src="./.github/banner.svg" alt="eo-cli" width="100%">
 
-Developer CLI for Evangelische Omroep. Azure PIM (activating your own role, approving requests from teammates) and EOchat, the EO AI assistant, straight from your terminal.
+<p align="center">The EO developer CLI: Azure PIM, deploys and EOchat from your terminal.</p>
+
+<p align="center">
+  <a href="https://github.com/evangelischeomroep/eo-cli/releases/latest">Latest release</a> ·
+  <a href="https://chat.eo.nl">EOchat</a>
+</p>
+
+`eo` is a small command-line tool for developers at the Evangelische Omroep. It wraps the Azure and EOchat chores of a working day, such as activating your Contributor role, approving a teammate's PIM request or asking EOchat about a diff, in one command each.
+
+## What it does
+
+- **Azure PIM in one command.** Activate your Contributor role for eight hours, see how long it has left, and approve your teammates' requests.
+- **Deploys without the portal.** Start the release pipeline of one or more Function Apps on test or production, and watch them finish.
+- **EOchat in the terminal.** Ask EOchat a question, pipe in a diff or a log as context, or chat interactively with its models and knowledge bases.
+- **EOchat for Claude Code.** `eo mcp` exposes EOchat as an MCP server, so Claude Code or any MCP client can ask it questions.
 
 ## Installation
 
@@ -59,6 +73,16 @@ go install github.com/evangelischeomroep/eo-cli/cmd/eo@latest
 
 ```
 eo <command> [flags] [arguments]
+```
+
+### `eo deploy`
+
+Deploy Function Apps to test or production. Pick the apps from a list, or take them all with `--all`; `--status` watches until they finish. A production deploy needs the test stage to be completed first and asks for confirmation.
+
+```bash
+eo deploy test
+eo deploy test --all
+eo deploy prod -s
 ```
 
 ### `eo pim`
@@ -219,14 +243,6 @@ eo pim --help
 eo pim approve --help
 ```
 
-## Releasing a new version
+## Contributing
 
-1. Make sure all changes are on `main`
-2. Tag the new version and push:
-
-```bash
-git tag v1.2.3
-git push origin v1.2.3
-```
-
-GitHub Actions will automatically build binaries for macOS (Intel + ARM) and Linux, publish a GitHub Release, and update `Casks/eo.rb` for Homebrew installations.
+Working on this repo? [AGENTS.md](./AGENTS.md) has the setup, conventions and checks.

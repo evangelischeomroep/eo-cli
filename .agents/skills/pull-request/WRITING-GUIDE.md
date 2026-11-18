@@ -6,7 +6,7 @@ Schrijf voor een collega die de codebase kent en in GitHub wil beoordelen wat er
 
 - Schrijf in het Nederlands en blijf zo mogelijk binnen 70 tekens.
 - Benoem de verandering in de tegenwoordige tijd. Bijvoorbeeld `Help en shellcompletions komen uit dezelfde commanddefinities`.
-- Begin met `<KEY> | ` als er een ticket is. Laat conventionele commitprefixen zoals `feat:` weg.
+- Begin met `<KEY> | ` als er een ticket is.
 
 ## Beschrijving
 

@@ -39,7 +39,7 @@ Use the [pull-request skill](.agents/skills/pull-request/SKILL.md) when opening 
 
 Run **Release** from `main` in GitHub Actions and enter a `vX.Y.Z` tag. The workflow checks the code, pushes the tag, publishes the release and links to the generated Homebrew cask update. Homebrew serves the new version after the cask PR merges. See the [release runbook](docs/operations/releases.md) for the steps and the private repository cutover.
 
-Commits starting with `chore:`, `ci:` or `docs:` stay out of the changelog.
+Commit messages are free-form. GoReleaser omits messages starting with `chore:`, `ci:` or `docs:` from the changelog.
 
 ## Documentation
 

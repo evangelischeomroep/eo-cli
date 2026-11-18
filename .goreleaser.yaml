@@ -46,6 +46,12 @@ homebrew_casks:
         - zsh
     url:
       using: EoReleaseDownloadStrategy
+    hooks:
+      post:
+        install_steps: |
+          on_macos do
+            run "/usr/bin/xattr", args: ["-d", "com.apple.quarantine", "eo"], chdir: "."
+          end
     custom_block: |
       require "download_strategy"
 
@@ -81,12 +87,6 @@ homebrew_casks:
         end
       end
 
-      # GoReleaser does not yet emit postflight_steps (goreleaser/goreleaser#6873).
-      postflight_steps do
-        on_macos do
-          run "/usr/bin/xattr", args: ["-d", "com.apple.quarantine", "eo"], chdir: "."
-        end
-      end
     skip_upload: auto
     repository:
       owner: evangelischeomroep

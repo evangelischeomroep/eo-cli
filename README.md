@@ -19,12 +19,17 @@
 
 ### Homebrew (macOS and Linux, recommended)
 
-Install with Homebrew:
+Sign in to GitHub with an account that has access to the EO repository, then install with Homebrew:
 
 ```bash
+gh auth login --hostname github.com --git-protocol https --web
+gh auth setup-git --hostname github.com
 brew tap evangelischeomroep/eo-cli https://github.com/evangelischeomroep/eo-cli
 brew install --cask evangelischeomroep/eo-cli/eo
 ```
+
+For an existing installation, sign in the same way and run `brew upgrade --cask eo`.
+Homebrew can also use a fine-grained `HOMEBREW_GITHUB_API_TOKEN` with read access to this repository's contents.
 
 Homebrew also installs the Azure CLI dependency and shell completions. Sign in before using `eo`:
 
@@ -43,7 +48,8 @@ Download the correct binary from the [Releases page](https://github.com/evangeli
 
 ```bash
 # Replace the URL with the correct architecture for your machine
-curl -L https://github.com/evangelischeomroep/eo-cli/releases/latest/download/eo_darwin_arm64.tar.gz | tar xz
+gh release download --repo evangelischeomroep/eo-cli --pattern eo_darwin_arm64.tar.gz
+tar -xzf eo_darwin_arm64.tar.gz
 sudo mv eo /usr/local/bin/
 ```
 
@@ -58,7 +64,7 @@ eo version
 If you have Go installed:
 
 ```bash
-go install github.com/evangelischeomroep/eo-cli/cmd/eo@latest
+GOPRIVATE=github.com/evangelischeomroep/eo-cli go install github.com/evangelischeomroep/eo-cli/cmd/eo@latest
 ```
 
 ## Requirements

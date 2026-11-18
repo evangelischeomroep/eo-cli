@@ -31,18 +31,15 @@ A change is done when this passes:
 make check
 ```
 
-It runs `go mod tidy`, the tests, `go vet` and a build; commit any changes `tidy` makes to `go.mod` and `go.sum`. No workflow runs on pull requests, so this is the only gate before a release.
+It runs `go mod tidy`, the tests, `go vet` and a build. Commit any changes `tidy` makes to `go.mod` and `go.sum`.
+
+Use the [pull-request skill](.agents/skills/pull-request/SKILL.md) when opening or updating a PR. Apply the `warden` label to request a review on a non-draft PR from this repository.
 
 ## Releasing
 
-Tag the release on `main` and push the tag:
+Run **Release** from `main` in GitHub Actions and enter a `vX.Y.Z` tag. The workflow checks the code, pushes the tag, publishes the release and links to the generated Homebrew cask update. Homebrew serves the new version after the cask PR merges. See the [release runbook](docs/operations/releases.md) for the steps and the private repository cutover.
 
-```bash
-git tag v1.2.3
-git push origin v1.2.3
-```
-
-The Release workflow runs GoReleaser: it builds binaries for macOS and Linux (Intel and ARM), publishes the GitHub Release, and opens a pull request that updates the Homebrew cask, because `main` only accepts pull requests. Merge that pull request; until then, Homebrew users stay on the previous version. Commits starting with `chore:`, `ci:` or `docs:` stay out of the changelog.
+Commits starting with `chore:`, `ci:` or `docs:` stay out of the changelog.
 
 ## Documentation
 

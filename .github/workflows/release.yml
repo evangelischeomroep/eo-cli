@@ -4,10 +4,18 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag (vX.Y.Z)
+        required: true
+        type: string
 
 permissions:
   contents: write
-  pull-requests: write
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
 
 jobs:
   release:
@@ -21,9 +29,63 @@ jobs:
         with:
           go-version: "1.27.4"
 
+      - name: Validate release target
+        id: release
+        env:
+          REQUESTED_TAG: ${{ inputs.tag }}
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == workflow_dispatch ]]; then
+            if [[ "$GITHUB_REF" != refs/heads/main ]]; then
+              echo "::error::Run this workflow from main."
+              exit 1
+            fi
+            tag="$REQUESTED_TAG"
+          else
+            tag="$GITHUB_REF_NAME"
+          fi
+          if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Use a release tag in the form vX.Y.Z."
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor HEAD refs/remotes/origin/main; then
+            echo "::error::The release commit must be on main."
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Check release build
+        run: |
+          make check
+          git diff --exit-code -- go.mod go.sum
+
+      - name: Push the release tag
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          ref="refs/tags/$RELEASE_TAG"
+          if git show-ref --verify --quiet "$ref"; then
+            if [[ "$(git rev-parse "$ref^{commit}")" != "$(git rev-parse HEAD)" ]]; then
+              echo "::error::The release tag already points to another commit."
+              exit 1
+            fi
+          else
+            git tag "$RELEASE_TAG"
+            git push origin "$ref"
+          fi
+
       - uses: goreleaser/goreleaser-action@v7
         with:
-          version: latest
+          version: v2.20.2
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GORELEASER_CURRENT_TAG: ${{ steps.release.outputs.tag }}
+
+      - name: Link the Homebrew cask update
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          branch="eo-${RELEASE_TAG#v}"
+          printf '[Open the Homebrew cask PR](%s/%s/compare/main...%s?expand=1)\n' \
+            "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$branch" >> "$GITHUB_STEP_SUMMARY"

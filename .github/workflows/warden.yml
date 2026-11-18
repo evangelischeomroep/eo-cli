@@ -1,0 +1,47 @@
+name: Warden
+
+on:
+  pull_request:
+    types: [labeled]
+
+permissions:
+  contents: read
+
+jobs:
+  review:
+    if: >-
+      github.event.label.name == 'warden' &&
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: warden-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
+    steps:
+      - name: Check out the pull request
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Analyze
+        id: analyze
+        uses: getsentry/warden@9ac18f90e5287a8d59476448070e9c9257477aed # v0.53.0
+        env:
+          WARDEN_OPENAI_API_KEY: ${{ secrets.WARDEN_OPENAI_API_KEY }}
+        with:
+          mode: analyze
+
+      - name: Report
+        if: ${{ !cancelled() && steps.analyze.outputs.findings-file != '' }}
+        uses: getsentry/warden@9ac18f90e5287a8d59476448070e9c9257477aed # v0.53.0
+        env:
+          WARDEN_OPENAI_API_KEY: ${{ secrets.WARDEN_OPENAI_API_KEY }}
+        with:
+          mode: report
+          findings-file: ${{ steps.analyze.outputs.findings-file }}

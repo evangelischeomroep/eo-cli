@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -91,6 +93,9 @@ func fetchLatestVersion() (string, error) {
 		return "", err
 	}
 	req.Header.Set("User-Agent", "eo-cli/"+version)
+	if token := githubReleaseToken(); token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -118,6 +123,19 @@ func fetchLatestVersion() (string, error) {
 
 	writeCache(versionCache{Version: release.TagName, CheckedAt: time.Now()})
 	return release.TagName, nil
+}
+
+func githubReleaseToken() string {
+	if token := strings.TrimSpace(os.Getenv("HOMEBREW_GITHUB_API_TOKEN")); token != "" {
+		return token
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), updateCheckTimeout)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, "gh", "auth", "token", "--hostname", "github.com").Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
 }
 
 func cachePath() (string, error) {

@@ -1,10 +1,10 @@
 # eo-cli
 
-`eo` is a single Go binary that EO developers install through Homebrew to run Azure PIM, Function App deploys and EOchat from the terminal. The repo is public, and every `v*` tag ships a release to everyone who installed it.
+`eo` is a single Go binary that EO developers install through Homebrew to use Azure PIM and EOchat from the terminal. The repo is public, and every `v*` tag ships a release to everyone who installed it.
 
 ## What we never compromise on
 
-1. **A production deploy stays gated.** `eo deploy prod` only approves apps whose test stage has completed, and only after the user confirms the list. Keep both checks for every new deploy path.
+1. **A production deploy stays gated.** Any new production deploy path must verify that each app's test stage has completed and get the user's confirmation of the app list before approving deployment.
 2. **The EOchat key stays private.** The key is written to the user's config with mode 0600, and `EOCHAT_API_KEY` overrides it. Never log it or write it anywhere else.
 
 ## Ways to hurt yourself
@@ -56,15 +56,13 @@ Most changes need no documentation; agents can read the code.
 
 ## How it works
 
-`cmd/eo/main.go` dispatches each command. The Azure commands get their tokens from the Azure CLI (`az account get-access-token`) and call Azure Resource Manager, Microsoft Graph and Azure DevOps directly. `eo deploy` lists the Function Apps in `rg-<env>-webapps` and runs the Azure DevOps pipeline named after the app, without its `app-<env>-` prefix, plus `_release`. `eo ask` and `eo mcp` talk to EOchat, an Open WebUI server, with the user's API key. Once a day the binary checks GitHub for a newer release and prints a notice.
+`cmd/eo/main.go` dispatches each command. The Azure commands get their tokens from the Azure CLI (`az account get-access-token`) and call Azure Resource Manager and Microsoft Graph directly. `eo ask` and `eo mcp` talk to EOchat, an Open WebUI server, with the user's API key. Once a day the binary checks GitHub for a newer release and prints a notice.
 
 ## Where code lives
 
 - `cmd/eo` - the commands, their help texts and the shell completion scripts.
-- `cmd/eo/pipeline-map.json` - Function Apps whose deploy pipeline has a different name. It is embedded in the binary, so a new entry needs a release.
 - `internal/azure` - the `az` token calls and the Azure REST client.
 - `internal/pim` - PIM activation, status and approvals.
-- `internal/deploy` - Function App listing and Azure DevOps pipeline stages.
 - `internal/eochat` - the EOchat client, the stored config and local conversations.
 - `internal/mcp` - the MCP server behind `eo mcp`.
 

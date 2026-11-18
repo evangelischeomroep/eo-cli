@@ -1,6 +1,6 @@
 <img src="./.github/banner.svg" alt="eo-cli" width="100%">
 
-<p align="center">The EO developer CLI: Azure PIM, deploys and EOchat from your terminal.</p>
+<p align="center">Use Azure PIM and EOchat from your terminal with the EO developer CLI.</p>
 
 <p align="center">
   <a href="https://github.com/evangelischeomroep/eo-cli/releases/latest">Latest release</a> ·
@@ -12,7 +12,6 @@
 ## What it does
 
 - **Azure PIM in one command.** Activate your Contributor role for eight hours, see how long it has left, and approve your teammates' requests.
-- **Deploys without the portal.** Start the release pipeline of one or more Function Apps on test or production, and watch them finish.
 - **EOchat in the terminal.** Ask EOchat a question, pipe in a diff or a log as context, or chat interactively with its models and knowledge bases.
 - **EOchat for Claude Code.** `eo mcp` exposes EOchat as an MCP server, so Claude Code or any MCP client can ask it questions.
 
@@ -73,16 +72,6 @@ go install github.com/evangelischeomroep/eo-cli/cmd/eo@latest
 
 ```
 eo <command> [flags] [arguments]
-```
-
-### `eo deploy`
-
-Deploy Function Apps to test or production. Pick the apps from a list, or take them all with `--all`; `--status` watches until they finish. A production deploy needs the test stage to be completed first and asks for confirmation.
-
-```bash
-eo deploy test
-eo deploy test --all
-eo deploy prod -s
 ```
 
 ### `eo pim`

@@ -49,7 +49,6 @@ const zshCompletion = `_eo() {
     command)
       local -a commands
       commands=(
-        'deploy:Deploy Function Apps to test or prod'
         'pim:Activate the Contributor role for 8h'
         'whoami:Show the current Azure user and subscription'
         'ask:Ask EOchat from the terminal'
@@ -62,15 +61,6 @@ const zshCompletion = `_eo() {
       ;;
     args)
       case $words[2] in
-        deploy)
-          if (( CURRENT == 3 )); then
-            local -a envs
-            envs=('test:Deploy to test' 'prod:Deploy to production')
-            _describe 'environment' envs
-          else
-            _arguments '--all[Deploy all apps without selection]' '-a[Deploy all apps without selection]'
-          fi
-          ;;
         pim)
           local -a pim_cmds
           pim_cmds=('approve:List and approve pending PIM requests' 'status:Show if your Contributor role is active')
@@ -109,13 +99,7 @@ const bashCompletion = `_eo_completion() {
 
   case "${prev}" in
     eo)
-      COMPREPLY=($(compgen -W "deploy pim whoami ask mcp version completion help" -- "${cur}"))
-      ;;
-    deploy)
-      COMPREPLY=($(compgen -W "test prod" -- "${cur}"))
-      ;;
-    test|prod)
-      COMPREPLY=($(compgen -W "--all -a" -- "${cur}"))
+      COMPREPLY=($(compgen -W "pim whoami ask mcp version completion help" -- "${cur}"))
       ;;
     pim)
       COMPREPLY=($(compgen -W "approve status" -- "${cur}"))
@@ -137,7 +121,6 @@ complete -F _eo_completion eo
 
 const fishCompletion = `complete -c eo -f
 
-complete -c eo -n '__fish_use_subcommand' -a deploy -d 'Deploy Function Apps to test or prod'
 complete -c eo -n '__fish_use_subcommand' -a pim -d 'Activate the Contributor role for 8h'
 complete -c eo -n '__fish_use_subcommand' -a whoami -d 'Show the current Azure user and subscription'
 complete -c eo -n '__fish_use_subcommand' -a ask -d 'Ask EOchat from the terminal'
@@ -145,10 +128,6 @@ complete -c eo -n '__fish_use_subcommand' -a mcp -d 'Expose EOchat to Claude Cod
 complete -c eo -n '__fish_use_subcommand' -a version -d 'Print the current version'
 complete -c eo -n '__fish_use_subcommand' -a completion -d 'Output shell completion script'
 complete -c eo -n '__fish_use_subcommand' -a help -d 'Show help for a command'
-
-complete -c eo -n '__fish_seen_subcommand_from deploy; and not __fish_seen_subcommand_from test prod' -a test -d 'Deploy to test'
-complete -c eo -n '__fish_seen_subcommand_from deploy; and not __fish_seen_subcommand_from test prod' -a prod -d 'Deploy to production'
-complete -c eo -n '__fish_seen_subcommand_from test prod' -s a -l all -d 'Deploy all apps without selection'
 
 complete -c eo -n '__fish_seen_subcommand_from pim; and not __fish_seen_subcommand_from approve status' -a approve -d 'List and approve pending PIM requests'
 complete -c eo -n '__fish_seen_subcommand_from pim; and not __fish_seen_subcommand_from approve status' -a status -d 'Show if your Contributor role is active'

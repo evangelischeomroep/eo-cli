@@ -23,7 +23,6 @@ func printMainHelp() {
 	h.section("USAGE")
 	h.line("  eo <command> [flags] [arguments]")
 	h.section("COMMANDS")
-	h.cmd("deploy", "Deploy Function Apps to test or prod")
 	h.cmd("pim", "Activate the Contributor role for 8h")
 	h.cmd("pim approve", "List and approve pending PIM requests")
 	h.cmd("pim status", "Show if your Contributor role is active")
@@ -36,8 +35,6 @@ func printMainHelp() {
 	h.section("FLAGS")
 	h.flag("-h, --help", "Show help")
 	h.section("EXAMPLES")
-	h.example("Deploy selected apps to test", "eo deploy test")
-	h.example("Deploy all apps to test", "eo deploy test --all")
 	h.example("Activate Contributor role with default justification", "eo pim")
 	h.example("Approve pending PIM requests interactively", "eo pim approve")
 	h.example("Ask EOchat a question", `eo ask "hoe werkt onze deploy pipeline?"`)
@@ -52,30 +49,6 @@ func printMainHelp() {
 	h.flag("EOCHAT_API_KEY", "EOchat API key (overrides `eo ask login`)")
 	h.blank()
 	h.line(dim("Run ") + cyan("eo <command> --help") + dim(" for details on a specific command."))
-	h.print()
-}
-
-func printDeployHelp() {
-	var h helpDoc
-	h.line(bold("eo deploy") + dim(" — Deploy Function Apps to test or prod"))
-	h.blank()
-	h.line("  Lists all Function Apps in the target environment's resource group,")
-	h.line("  lets you pick which ones to deploy, and triggers the pipeline stage.")
-	h.section("USAGE")
-	h.line("  eo deploy [test|prod] [--all] [--status]")
-	h.section("ARGUMENTS")
-	h.flag("test|prod", "Target environment (default: test)")
-	h.section("FLAGS")
-	h.flag("--all, -a", "Deploy all apps without interactive selection")
-	h.flag("--status, -s", "Watch deployment status until all apps complete")
-	h.section("EXAMPLES")
-	h.example("Interactive selection for test", "eo deploy test")
-	h.example("Deploy all apps to test", "eo deploy test --all")
-	h.example("Deploy and watch status", "eo deploy test -s")
-	h.example("Deploy selected apps to prod", "eo deploy prod")
-	h.section("NOTES")
-	h.line("  • Prod deployments require the test stage to be completed first")
-	h.line("  • Prod will ask for confirmation before approving")
 	h.print()
 }
 

@@ -38,12 +38,6 @@ func run(args []string) error {
 			fmt.Println(dim("https://github.com/evangelischeomroep/eo-cli/releases/tag/" + tag))
 		}
 		return nil
-	case "deploy":
-		if hasHelpFlag(args[1:]) {
-			printDeployHelp()
-			return nil
-		}
-		return cmdDeploy(args[1:])
 	case "pim":
 		if len(args) >= 2 && args[1] == "approve" {
 			if hasHelpFlag(args[2:]) {

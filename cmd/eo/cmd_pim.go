@@ -6,9 +6,51 @@ import (
 	"time"
 
 	"charm.land/huh/v2"
+	"github.com/spf13/cobra"
+
 	"github.com/evangelischeomroep/eo-cli/internal/azure"
 	"github.com/evangelischeomroep/eo-cli/internal/pim"
 )
+
+const defaultPimApprovalJustification = "Approved via eo-cli"
+
+func newPimCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "pim",
+		Short: "Manage Azure PIM activations and approvals",
+		Args:  cobra.NoArgs,
+		RunE:  func(cmd *cobra.Command, _ []string) error { return cmd.Help() },
+	}
+	activate := &cobra.Command{
+		Use:               "activate [reason]",
+		Short:             "Activate the Contributor role for 8 hours",
+		Long:              fmt.Sprintf("Activate the Contributor role on the %q subscription for 8 hours. Azure records the optional reason in the PIM audit log.", azure.SubscriptionName),
+		Example:           "  eo pim activate\n  eo pim activate \"deploying release 2.4\"",
+		Args:              cobra.MaximumNArgs(1),
+		ValidArgsFunction: cobra.NoFileCompletions,
+		RunE:              func(_ *cobra.Command, args []string) error { return cmdPimRequest(optionalArg(args)) },
+	}
+	var approveAll bool
+	approve := &cobra.Command{
+		Use:               "approve [justification]",
+		Short:             "Approve pending PIM requests",
+		Long:              fmt.Sprintf("List requests where you are an approver and choose which to approve. The default justification is %q.", defaultPimApprovalJustification),
+		Example:           "  eo pim approve\n  eo pim approve --all \"sprint review batch\"",
+		Args:              cobra.MaximumNArgs(1),
+		ValidArgsFunction: cobra.NoFileCompletions,
+		RunE: func(_ *cobra.Command, args []string) error {
+			return cmdPimApprove(approveAll, optionalArg(args))
+		},
+	}
+	approve.Flags().BoolVar(&approveAll, "all", false, "Approve all pending requests without prompting")
+	cmd.AddCommand(activate, approve, &cobra.Command{
+		Use:   "status",
+		Short: "Show whether your Contributor role is active and when it expires",
+		Args:  cobra.NoArgs,
+		RunE:  func(*cobra.Command, []string) error { return cmdPimStatus() },
+	})
+	return cmd
+}
 
 func cmdPimStatus() error {
 	creds, err := loadCreds(true)
@@ -33,7 +75,7 @@ func cmdPimStatus() error {
 	return nil
 }
 
-func cmdPimRequest(args []string) error {
+func cmdPimRequest(justification string) error {
 	fmt.Println(bold("→ Activating Contributor role on ") + cyan(azure.SubscriptionName) + bold(" (8h)"))
 	fmt.Println()
 
@@ -42,9 +84,8 @@ func cmdPimRequest(args []string) error {
 		return err
 	}
 
-	justification := "Requesting access to perform necessary tasks."
-	if j := firstPositional(args); j != "" {
-		justification = j
+	if justification == "" {
+		justification = "Requesting access to perform necessary tasks."
 	}
 
 	err = pim.RequestContributorRole(creds.subscriptionID, creds.userID, creds.accessToken, justification)
@@ -93,11 +134,9 @@ func principalLabel(resolved map[string]pim.Principal, id string) string {
 	return id
 }
 
-func cmdPimApprove(args []string) error {
-	approveAll := hasFlag(args, "--all")
-	justification := "Approved via eo-cli"
-	if j := firstPositional(args); j != "" {
-		justification = j
+func cmdPimApprove(approveAll bool, justification string) error {
+	if justification == "" {
+		justification = defaultPimApprovalJustification
 	}
 
 	creds, err := loadCreds(false)

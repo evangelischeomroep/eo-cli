@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"strings"
 )
@@ -41,7 +40,7 @@ func dim(s string) string    { return paint(ansiDim, s) }
 func red(s string) string    { return paint(ansiRed, s) }
 func green(s string) string  { return paint(ansiGreen, s) }
 func yellow(s string) string { return paint(ansiYellow, s) }
-func cyan(s string) string { return paint(ansiCyan, s) }
+func cyan(s string) string   { return paint(ansiCyan, s) }
 
 // pad right-pads s with spaces to width w.
 func pad(s string, w int) string {
@@ -50,27 +49,3 @@ func pad(s string, w int) string {
 	}
 	return s + strings.Repeat(" ", w-len(s))
 }
-
-// helpDoc builds a help page as a single string and prints it at once.
-type helpDoc struct{ strings.Builder }
-
-func (h *helpDoc) line(s string) { h.WriteString(s); h.WriteByte('\n') }
-func (h *helpDoc) blank()        { h.WriteByte('\n') }
-func (h *helpDoc) section(title string) {
-	h.blank()
-	h.line(bold(title))
-}
-func (h *helpDoc) cmd(name, desc string) {
-	h.WriteString(fmt.Sprintf("  %s  %s\n", cyan(pad(name, 16)), desc))
-}
-func (h *helpDoc) flag(name, desc string) {
-	h.WriteString(fmt.Sprintf("  %s  %s\n", pad(name, 16), desc))
-}
-func (h *helpDoc) example(comment, cmd string) {
-	if comment != "" {
-		h.line(dim("  # " + comment))
-	}
-	h.line("  " + cmd)
-	h.blank()
-}
-func (h *helpDoc) print() { fmt.Print(h.String()) }

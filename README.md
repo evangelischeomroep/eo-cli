@@ -74,13 +74,13 @@ go install github.com/evangelischeomroep/eo-cli/cmd/eo@latest
 eo <command> [flags] [arguments]
 ```
 
-### `eo pim`
+### `eo pim activate`
 
 Activate the Contributor role for 8 hours.
 
 ```bash
-eo pim
-eo pim "deploying release 2.4"
+eo pim activate
+eo pim activate "deploying release 2.4"
 ```
 
 ### `eo pim status`
@@ -187,7 +187,7 @@ Then, inside Claude Code: _"Use eochat_ask to check how EO names Azure resources
 
 ### `eo completion`
 
-Output a shell completion script so Tab autocompletes commands.
+Output a shell completion script so Tab completes commands and flags.
 
 **zsh** — add to `~/.zshrc`:
 
@@ -195,7 +195,7 @@ Output a shell completion script so Tab autocompletes commands.
 source <(eo completion zsh)
 ```
 
-**bash** — add to `~/.bashrc`:
+**bash** — load [bash-completion](https://github.com/scop/bash-completion), then add to `~/.bashrc`:
 
 ```bash
 source <(eo completion bash)
@@ -212,8 +212,9 @@ After reloading your shell, Tab completion works:
 
 ```
 eo p<Tab>        → eo pim
-eo pim <Tab>     → eo pim approve / eo pim status
+eo pim <Tab>     → eo pim activate / eo pim approve / eo pim status
 eo ask <Tab>     → eo ask login / models / model / ...
+eo ask -f <Tab>  → local files
 ```
 
 ### `eo version`
@@ -228,8 +229,9 @@ eo version
 
 ```bash
 eo --help
-eo pim --help
+eo help pim
 eo pim approve --help
+eo ask models --help
 ```
 
 ## Contributing

@@ -56,7 +56,7 @@ Most changes need no documentation; agents can read the code.
 
 ## How it works
 
-`cmd/eo/main.go` dispatches each command. The Azure commands get their tokens from the Azure CLI (`az account get-access-token`) and call Azure Resource Manager and Microsoft Graph directly. `eo ask` and `eo mcp` talk to EOchat, an Open WebUI server, with the user's API key. Once a day the binary checks GitHub for a newer release and prints a notice.
+`cmd/eo/main.go` assembles the Cobra command tree. The Azure commands get their tokens from the Azure CLI (`az account get-access-token`) and call Azure Resource Manager and Microsoft Graph directly. `eo ask` and `eo mcp` talk to EOchat, an Open WebUI server, with the user's API key. Once a day the binary checks GitHub for a newer release and prints a notice.
 
 ## Where code lives
 
@@ -68,4 +68,4 @@ Most changes need no documentation; agents can read the code.
 
 ## Taste
 
-- **A command reaches every surface.** A new command or flag goes into the dispatch in `main.go`, its help text in `help.go`, the zsh, bash and fish scripts in `completion.go`, and the README.
+- **Define commands and flags once.** Cobra generates help and shell completions from the command definitions. Add usage for new commands and flags to the README.

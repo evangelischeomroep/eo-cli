@@ -8,20 +8,34 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/spf13/cobra"
+
 	"github.com/evangelischeomroep/eo-cli/internal/eochat"
 	"github.com/evangelischeomroep/eo-cli/internal/mcp"
 )
 
 const mcpServerName = "eochat"
 
-func cmdMCP(args []string) error {
-	if len(args) > 0 && args[0] == "install" {
-		return cmdMCPInstall(args[1:])
+func newMCPCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "mcp",
+		Short: "Expose EOchat to Claude Code and other MCP clients",
+		Long: `Run the EOchat MCP server over stdin and stdout using the same login as
+eo ask. MCP clients can ask a question, list models and list knowledge bases.`,
+		Example: "  eo mcp install\n  eo mcp install --project",
+		Args:    cobra.NoArgs,
+		RunE:    func(*cobra.Command, []string) error { return serveMCP() },
 	}
-	if len(args) > 0 {
-		return fmt.Errorf("unknown mcp command %q (see `eo mcp --help`)", args[0])
+	var project bool
+	install := &cobra.Command{
+		Use:   "install",
+		Short: "Register EOchat with Claude Code",
+		Args:  cobra.NoArgs,
+		RunE:  func(*cobra.Command, []string) error { return cmdMCPInstall(project) },
 	}
-	return serveMCP()
+	install.Flags().BoolVar(&project, "project", false, "Register in this project's .mcp.json")
+	cmd.AddCommand(install)
+	return cmd
 }
 
 // serveMCP runs the stdio MCP server. Login problems are reported per tool
@@ -178,9 +192,9 @@ func serveMCP() error {
 }
 
 // cmdMCPInstall registers the server with Claude Code via `claude mcp add`.
-func cmdMCPInstall(args []string) error {
+func cmdMCPInstall(project bool) error {
 	scope := "user"
-	if hasFlag(args, "--project") {
+	if project {
 		scope = "project"
 	}
 	exe := "eo"

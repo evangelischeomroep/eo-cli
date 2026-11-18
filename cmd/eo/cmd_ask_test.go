@@ -1,44 +1,60 @@
 package main
 
 import (
+	"io"
+	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/spf13/cobra"
 )
 
-func TestParseAskArgs(t *testing.T) {
-	o, err := parseAskArgs([]string{"-m", "gpt", "-c", "--system=be brief", "-f", "a.pdf", "-k", "Handboek", "--web", "what", "is", "this?"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if o.model != "gpt" || !o.cont || o.system != "be brief" || !o.web {
-		t.Errorf("flags: %+v", o)
-	}
-	if len(o.files) != 1 || len(o.knowledge) != 1 {
-		t.Errorf("repeatables: %+v", o)
-	}
-	if o.prompt != "what is this?" {
-		t.Errorf("prompt = %q", o.prompt)
-	}
-
-	o, err = parseAskArgs([]string{"--", "-not", "a", "flag"})
-	if err != nil || o.prompt != "-not a flag" {
-		t.Errorf("-- handling: %+v %v", o, err)
-	}
-
-	if _, err := parseAskArgs([]string{"--bogus"}); err == nil {
-		t.Error("unknown flag should error")
-	}
-	if _, err := parseAskArgs([]string{"-m"}); err == nil {
-		t.Error("missing value should error")
-	}
-}
-
-func TestAskWantsHelp(t *testing.T) {
-	if !askWantsHelp([]string{"--help"}) || !askWantsHelp([]string{"help"}) {
-		t.Error("help flags not detected")
-	}
-	if askWantsHelp([]string{"help", "me", "with", "go"}) || askWantsHelp([]string{"how", "does", "--help", "work"}) || askWantsHelp(nil) {
-		t.Error("questions mentioning help must not trigger help")
+func TestAskArgumentParsing(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		args    []string
+		want    askOptions
+		wantErr string
+	}{
+		{
+			name: "flags and prompt",
+			args: []string{"-m", "models", "-c", "--system=be brief", "--web", "what", "is", "this?", "--raw"},
+			want: askOptions{model: "models", cont: true, system: "be brief", web: true, raw: true, prompt: "what is this?"},
+		},
+		{
+			name: "repeatable values preserve commas",
+			args: []string{"-f", "a,b.pdf", "--file=c.pdf", "--knowledge=News,Sport", "-k", "Handboek", "review"},
+			want: askOptions{files: []string{"a,b.pdf", "c.pdf"}, knowledge: []string{"News,Sport", "Handboek"}, prompt: "review"},
+		},
+		{name: "chat or piped input", args: []string{}},
+		{name: "help as text", args: []string{"help", "me"}, want: askOptions{prompt: "help me"}},
+		{name: "literal subcommand", args: []string{"--", "models"}, want: askOptions{prompt: "models"}},
+		{name: "literal flag", args: []string{"--", "--help"}, want: askOptions{prompt: "--help"}},
+		{name: "unknown flag", args: []string{"--bogus"}, wantErr: "unknown flag"},
+		{name: "missing value", args: []string{"-m"}, wantErr: "needs an argument"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var got askOptions
+			called := false
+			cmd := &cobra.Command{Use: "eo"}
+			cmd.AddCommand(newAskCommand(func(opts askOptions) error {
+				got, called = opts, true
+				return nil
+			}))
+			cmd.SetArgs(append([]string{"ask"}, test.args...))
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
+			err := cmd.Execute()
+			if test.wantErr != "" {
+				if called || err == nil || !strings.Contains(err.Error(), test.wantErr) {
+					t.Fatalf("called = %t, error = %v, want %q", called, err, test.wantErr)
+				}
+				return
+			}
+			if err != nil || !called || !reflect.DeepEqual(got, test.want) {
+				t.Fatalf("called = %t, options = %+v, error = %v, want %+v", called, got, err, test.want)
+			}
+		})
 	}
 }
 

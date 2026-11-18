@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"strings"
 
 	"golang.org/x/sync/errgroup"
 
@@ -51,22 +50,9 @@ func loadCreds(needUser bool) (*azureCreds, error) {
 	return &azureCreds{subscriptionID: subID, accessToken: token, userID: userID}, nil
 }
 
-func hasFlag(args []string, flags ...string) bool {
-	for _, arg := range args {
-		for _, f := range flags {
-			if arg == f {
-				return true
-			}
-		}
+func optionalArg(args []string) string {
+	if len(args) == 0 {
+		return ""
 	}
-	return false
-}
-
-func firstPositional(args []string) string {
-	for _, arg := range args {
-		if !strings.HasPrefix(arg, "-") {
-			return arg
-		}
-	}
-	return ""
+	return args[0]
 }

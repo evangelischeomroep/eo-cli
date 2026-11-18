@@ -3,87 +3,64 @@ package main
 import (
 	"fmt"
 	"os"
+	"slices"
+	"strings"
+
+	"github.com/spf13/cobra"
 )
 
 // version is set at build time via -ldflags "-X main.version=x.y.z"
 var version = "dev"
 
 func main() {
-	updateCh := startUpdateCheck()
-	err := run(os.Args[1:])
-	printUpdateNotice(updateCh, version)
+	args := os.Args[1:]
+	var updateCh <-chan string
+	if len(args) == 0 || !slices.Contains([]string{
+		"completion", cobra.ShellCompRequestCmd, cobra.ShellCompNoDescRequestCmd,
+	}, args[0]) {
+		updateCh = startUpdateCheck()
+	}
+	err := newRootCommand().Execute()
+	if updateCh != nil {
+		printUpdateNotice(updateCh, version)
+	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, red("✗ ")+err.Error())
 		os.Exit(1)
 	}
 }
 
-func run(args []string) error {
-	if len(args) == 0 {
-		printMainHelp()
-		return nil
+func newRootCommand() *cobra.Command {
+	root := &cobra.Command{
+		Use:           "eo",
+		Short:         "Evangelische Omroep developer CLI",
+		Long:          "Evangelische Omroep developer CLI for Azure PIM and EOchat.",
+		Version:       version,
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		RunE:          func(cmd *cobra.Command, _ []string) error { return cmd.Help() },
 	}
-
-	switch args[0] {
-	case "help", "-h", "--help":
-		printMainHelp()
-		return nil
-	case "version", "-v", "--version":
-		fmt.Printf("eo %s\n", version)
-		if version != "dev" {
-			tag := version
-			if len(tag) > 0 && tag[0] != 'v' {
-				tag = "v" + tag
-			}
-			fmt.Println(dim("https://github.com/evangelischeomroep/eo-cli/releases/tag/" + tag))
-		}
-		return nil
-	case "pim":
-		if len(args) >= 2 && args[1] == "approve" {
-			if hasHelpFlag(args[2:]) {
-				printPimApproveHelp()
-				return nil
-			}
-			return cmdPimApprove(args[2:])
-		}
-		if len(args) >= 2 && args[1] == "status" {
-			if hasHelpFlag(args[2:]) {
-				printPimStatusHelp()
-				return nil
-			}
-			return cmdPimStatus()
-		}
-		if hasHelpFlag(args[1:]) {
-			printPimHelp()
-			return nil
-		}
-		return cmdPimRequest(args[1:])
-	case "ask":
-		if askWantsHelp(args[1:]) {
-			printAskHelp()
-			return nil
-		}
-		return cmdAsk(args[1:])
-	case "mcp":
-		if hasHelpFlag(args[1:]) {
-			printMcpHelp()
-			return nil
-		}
-		return cmdMCP(args[1:])
-	case "whoami":
-		if hasHelpFlag(args[1:]) {
-			printWhoamiHelp()
-			return nil
-		}
-		return cmdWhoami()
-	case "completion":
-		shell := ""
-		if len(args) >= 2 {
-			shell = args[1]
-		}
-		return cmdCompletion(shell)
-	default:
-		printMainHelp()
-		return fmt.Errorf("unknown command: %s", args[0])
+	releaseLink := ""
+	if version != "dev" {
+		releaseLink = dim("https://github.com/evangelischeomroep/eo-cli/releases/tag/v"+strings.TrimPrefix(version, "v")) + "\n"
 	}
+	root.SetVersionTemplate("{{.Name}} {{.Version}}\n" + releaseLink)
+	root.AddCommand(newAskCommand(cmdAsk), newPimCommand(), newMCPCommand(),
+		&cobra.Command{
+			Use:   "whoami",
+			Short: "Show the current Azure user and subscription",
+			Args:  cobra.NoArgs,
+			RunE:  func(*cobra.Command, []string) error { return cmdWhoami() },
+		},
+		&cobra.Command{
+			Use:   "version",
+			Short: "Print the current version",
+			Args:  cobra.NoArgs,
+			RunE: func(cmd *cobra.Command, _ []string) error {
+				_, err := fmt.Fprintf(cmd.OutOrStdout(), "eo %s\n%s", version, releaseLink)
+				return err
+			},
+		},
+	)
+	return root
 }

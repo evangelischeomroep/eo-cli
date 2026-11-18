@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"charm.land/huh/v2"
+	"github.com/spf13/cobra"
 
 	"github.com/evangelischeomroep/eo-cli/internal/eochat"
 )
@@ -30,68 +31,82 @@ type askOptions struct {
 	prompt    string
 }
 
-func parseAskArgs(args []string) (askOptions, error) {
-	var o askOptions
-	var words []string
-	takeValue := func(i *int, flag string) (string, error) {
-		if eq := strings.IndexByte(flag, '='); eq >= 0 {
-			return flag[eq+1:], nil
-		}
-		if *i+1 >= len(args) {
-			return "", fmt.Errorf("flag %s needs a value", flag)
-		}
-		*i++
-		return args[*i], nil
+func newAskCommand(ask func(askOptions) error) *cobra.Command {
+	var opts askOptions
+	cmd := &cobra.Command{
+		Use:   "ask [question...]",
+		Short: "Ask EOchat from the terminal",
+		Long: `Ask EOchat a question and stream the answer to your terminal. Run without a
+question to start an interactive chat, or pipe input in as context.
+
+Run eo ask login to store a personal API key with mode 0600. EOCHAT_API_KEY,
+EOCHAT_MODEL and EOCHAT_URL override the saved settings.
+
+In interactive chat, use /model, /models, /knowledge, /use, /file, /system,
+/web, /new or /quit. End a line with a backslash to continue on the next line.
+Ctrl+C stops an answer.`,
+		Example: `  eo ask "hoe vraag ik PIM aan?"
+  git diff | eo ask "review this change"
+  eo ask -c "and how do I test that?"
+  eo ask -m gpt -k "EO Handboek" "hoe werkt PIM?"
+  eo ask -f ./architectuur.pdf "summarize the trade-offs"`,
+		ValidArgsFunction: cobra.NoFileCompletions,
+		RunE: func(_ *cobra.Command, args []string) error {
+			opts.prompt = strings.TrimSpace(strings.Join(args, " "))
+			return ask(opts)
+		},
 	}
-	for i := 0; i < len(args); i++ {
-		a := args[i]
-		name := a
-		if eq := strings.IndexByte(a, '='); eq >= 0 && strings.HasPrefix(a, "-") {
-			name = a[:eq]
-		}
-		switch name {
-		case "--":
-			words = append(words, args[i+1:]...)
-			i = len(args)
-		case "-m", "--model":
-			v, err := takeValue(&i, a)
-			if err != nil {
-				return o, err
-			}
-			o.model = v
-		case "-c", "--continue":
-			o.cont = true
-		case "-s", "--system":
-			v, err := takeValue(&i, a)
-			if err != nil {
-				return o, err
-			}
-			o.system = v
-		case "-f", "--file":
-			v, err := takeValue(&i, a)
-			if err != nil {
-				return o, err
-			}
-			o.files = append(o.files, v)
-		case "-k", "--knowledge":
-			v, err := takeValue(&i, a)
-			if err != nil {
-				return o, err
-			}
-			o.knowledge = append(o.knowledge, v)
-		case "--web":
-			o.web = true
-		case "--raw":
-			o.raw = true
-		default:
-			if strings.HasPrefix(a, "-") && len(a) > 1 {
-				return o, fmt.Errorf("unknown flag %s (see `eo ask --help`)", a)
-			}
-			words = append(words, a)
-		}
-	}
-	o.prompt = strings.TrimSpace(strings.Join(words, " "))
-	return o, nil
+	flags := cmd.Flags()
+	flags.StringVarP(&opts.model, "model", "m", "", "Model ID, name, or unique part of its name")
+	flags.BoolVarP(&opts.cont, "continue", "c", false, "Continue the previous conversation")
+	flags.StringVarP(&opts.system, "system", "s", "", "System prompt for this conversation")
+	flags.StringArrayVarP(&opts.files, "file", "f", nil, "Upload a file and use it as context (repeatable)")
+	flags.StringArrayVarP(&opts.knowledge, "knowledge", "k", nil, "Use an EOchat knowledge base (repeatable)")
+	flags.BoolVar(&opts.web, "web", false, "Let EOchat search the web if the server supports it")
+	flags.BoolVar(&opts.raw, "raw", false, "Print the answer as plain text")
+	_ = cmd.MarkFlagFilename("file")
+
+	cmd.AddCommand(
+		&cobra.Command{
+			Use:               "login [api-key]",
+			Short:             "Store your EOchat API key and choose a default model",
+			Long:              "Create a personal API key in EOchat under Settings → Account → API keys. Run eo ask login to enter it at the password prompt.",
+			Args:              cobra.MaximumNArgs(1),
+			ValidArgsFunction: cobra.NoFileCompletions,
+			RunE:              func(_ *cobra.Command, args []string) error { return cmdAskLogin(optionalArg(args)) },
+		},
+		&cobra.Command{
+			Use:   "logout",
+			Short: "Remove the stored API key",
+			Args:  cobra.NoArgs,
+			RunE:  func(*cobra.Command, []string) error { return cmdAskLogout() },
+		},
+		&cobra.Command{
+			Use:   "status",
+			Short: "Show the server, login, default model and last conversation",
+			Args:  cobra.NoArgs,
+			RunE:  func(*cobra.Command, []string) error { return cmdAskStatus() },
+		},
+		&cobra.Command{
+			Use:   "models",
+			Short: "List the models you can use",
+			Args:  cobra.NoArgs,
+			RunE:  func(*cobra.Command, []string) error { return cmdAskModels() },
+		},
+		&cobra.Command{
+			Use:   "model [name]",
+			Short: "Set the default model or choose one interactively",
+			Args:  cobra.MaximumNArgs(1),
+			RunE:  func(_ *cobra.Command, args []string) error { return cmdAskModel(optionalArg(args)) },
+		},
+		&cobra.Command{
+			Use:   "knowledge",
+			Short: "List knowledge bases you can use with -k",
+			Args:  cobra.NoArgs,
+			RunE:  func(*cobra.Command, []string) error { return cmdAskKnowledge() },
+		},
+	)
+	return cmd
 }
 
 func stdinIsTerminal() bool {
@@ -135,29 +150,7 @@ func describeAskError(err error) error {
 	return err
 }
 
-func cmdAsk(args []string) error {
-	if len(args) > 0 {
-		switch args[0] {
-		case "login":
-			return cmdAskLogin(args[1:])
-		case "logout":
-			return cmdAskLogout()
-		case "status":
-			return cmdAskStatus()
-		case "models":
-			return cmdAskModels()
-		case "model":
-			return cmdAskModel(args[1:])
-		case "knowledge":
-			return cmdAskKnowledge()
-		}
-	}
-
-	opts, err := parseAskArgs(args)
-	if err != nil {
-		return err
-	}
-
+func cmdAsk(opts askOptions) error {
 	piped := readPipedStdin()
 	switch {
 	case piped != "" && opts.prompt == "":
@@ -547,12 +540,11 @@ func selectModel(models []eochat.Model, current string) (eochat.Model, error) {
 
 // --- subcommands ---
 
-func cmdAskLogin(args []string) error {
+func cmdAskLogin(key string) error {
 	fileCfg, err := eochat.LoadConfig()
 	if err != nil {
 		return err
 	}
-	key := firstPositional(args)
 	if key == "" && stdinIsTerminal() {
 		fmt.Println(bold("EOchat login"))
 		fmt.Println(dim("  Create a personal API key at ") + cyan(fileCfg.BaseURL()) + dim(" → Settings → Account → API keys."))
@@ -714,7 +706,7 @@ func firstLine(s string) string {
 	return s
 }
 
-func cmdAskModel(args []string) error {
+func cmdAskModel(query string) error {
 	client, _, err := eochatClient()
 	if err != nil {
 		return err
@@ -728,8 +720,8 @@ func cmdAskModel(args []string) error {
 		return describeAskError(err)
 	}
 	var m eochat.Model
-	if q := firstPositional(args); q != "" {
-		m, err = eochat.ResolveModel(models, q)
+	if query != "" {
+		m, err = eochat.ResolveModel(models, query)
 	} else if stdinIsTerminal() {
 		m, err = selectModel(models, fileCfg.Model)
 	} else {

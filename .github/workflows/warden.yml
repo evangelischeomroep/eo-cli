@@ -1,0 +1,87 @@
+name: Warden
+
+on:
+  pull_request:
+    types: [labeled]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: warden-${{ github.event.pull_request.number }}-${{ github.event.label.name }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    if: >-
+      github.event.label.name == 'warden' &&
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      artifact-id: ${{ steps.findings.outputs.artifact-id }}
+    steps:
+      - name: Check out the pull request
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Analyze
+        id: analyze
+        uses: getsentry/warden@9ac18f90e5287a8d59476448070e9c9257477aed # v0.53.0
+        env:
+          WARDEN_OPENAI_API_KEY: ${{ secrets.WARDEN_OPENAI_API_KEY }}
+        with:
+          mode: analyze
+
+      - name: Prepare findings
+        if: ${{ !cancelled() && steps.analyze.outputs.findings-file != '' }}
+        env:
+          FINDINGS_FILE: ${{ steps.analyze.outputs.findings-file }}
+        run: cp -- "$FINDINGS_FILE" "$RUNNER_TEMP/warden-findings.json"
+
+      - name: Upload findings
+        if: ${{ !cancelled() && steps.analyze.outputs.findings-file != '' }}
+        id: findings
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: warden-findings-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/warden-findings.json
+          if-no-files-found: error
+          retention-days: 1
+
+  report:
+    needs: analyze
+    if: ${{ !cancelled() && needs.analyze.outputs.artifact-id != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
+    steps:
+      - name: Check out the reviewed commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Download findings
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ needs.analyze.outputs.artifact-id }}
+          path: ${{ runner.temp }}
+          merge-multiple: true
+
+      - name: Report
+        uses: getsentry/warden@9ac18f90e5287a8d59476448070e9c9257477aed # v0.53.0
+        env:
+          WARDEN_OPENAI_API_KEY: ${{ secrets.WARDEN_OPENAI_API_KEY }}
+        with:
+          mode: report
+          findings-file: ${{ runner.temp }}/warden-findings.json

@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -14,6 +16,7 @@ import (
 const (
 	updateCheckURL     = "https://api.github.com/repos/evangelischeomroep/eo-cli/releases/latest"
 	updateCheckTTL     = 24 * time.Hour
+	updateCheckRetry   = 5 * time.Minute
 	updateCheckTimeout = 400 * time.Millisecond
 	updateCheckWait    = 500 * time.Millisecond
 )
@@ -21,6 +24,14 @@ const (
 type versionCache struct {
 	Version   string    `json:"version"`
 	CheckedAt time.Time `json:"checked_at"`
+}
+
+func (c versionCache) fresh(now time.Time) bool {
+	ttl := updateCheckTTL
+	if c.Version == "" {
+		ttl = updateCheckRetry
+	}
+	return now.Sub(c.CheckedAt) < ttl
 }
 
 func startUpdateCheck() <-chan string {
@@ -81,26 +92,33 @@ func normalize(v string) string {
 }
 
 func fetchLatestVersion() (string, error) {
-	if cached, err := readCache(); err == nil && time.Since(cached.CheckedAt) < updateCheckTTL {
+	if cached, err := readCache(); err == nil && cached.fresh(time.Now()) {
 		return cached.Version, nil
 	}
 
-	client := &http.Client{Timeout: updateCheckTimeout}
-	req, err := http.NewRequest(http.MethodGet, updateCheckURL, nil)
+	ctx, cancel := context.WithTimeout(context.Background(), updateCheckTimeout)
+	defer cancel()
+	latest, err := fetchReleaseTag(ctx, updateCheckURL)
+	writeCache(versionCache{Version: latest, CheckedAt: time.Now()})
+	return latest, err
+}
+
+func fetchReleaseTag(ctx context.Context, url string) (string, error) {
+	token := githubReleaseToken(ctx)
+	resp, err := requestRelease(ctx, url, token)
 	if err != nil {
 		return "", err
 	}
-	req.Header.Set("User-Agent", "eo-cli/"+version)
-
-	resp, err := client.Do(req)
-	if err != nil {
-		writeCache(versionCache{CheckedAt: time.Now()})
-		return "", err
+	if token != "" && (resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusNotFound) {
+		resp.Body.Close()
+		resp, err = requestRelease(ctx, url, "")
+		if err != nil {
+			return "", err
+		}
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		writeCache(versionCache{CheckedAt: time.Now()})
 		return "", fmt.Errorf("unexpected status %d", resp.StatusCode)
 	}
 
@@ -108,16 +126,38 @@ func fetchLatestVersion() (string, error) {
 		TagName string `json:"tag_name"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
-		writeCache(versionCache{CheckedAt: time.Now()})
 		return "", err
 	}
 	if release.TagName == "" {
-		writeCache(versionCache{CheckedAt: time.Now()})
 		return "", fmt.Errorf("empty tag_name in response")
 	}
 
-	writeCache(versionCache{Version: release.TagName, CheckedAt: time.Now()})
 	return release.TagName, nil
+}
+
+func requestRelease(ctx context.Context, url, token string) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", "eo-cli/"+version)
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	return http.DefaultClient.Do(req)
+}
+
+func githubReleaseToken(ctx context.Context) string {
+	if token := strings.TrimSpace(os.Getenv("HOMEBREW_GITHUB_API_TOKEN")); token != "" {
+		return token
+	}
+	cmd := exec.CommandContext(ctx, "gh", "auth", "token", "--hostname", "github.com")
+	cmd.WaitDelay = 25 * time.Millisecond
+	out, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
 }
 
 func cachePath() (string, error) {

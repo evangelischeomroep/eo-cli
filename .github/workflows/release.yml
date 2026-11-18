@@ -1,29 +1,154 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag (vX.Y.Z)
+        required: true
+        type: string
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
+
+concurrency:
+  group: release
 
 jobs:
   release:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate release target and find existing release
+        id: release
+        shell: bash
+        env:
+          TAG: ${{ inputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          stable_tag='^v(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})$'
+          if [[ ! "$TAG" =~ $stable_tag ]]; then
+            echo "::error::Use a release tag in the form vX.Y.Z."
+            exit 1
+          fi
+
+          latest=$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases" \
+            --jq '.[] | select(.draft == false and .prerelease == false) | .tag_name' \
+            | sed -nE "/$stable_tag/p" | sort -V | tail -n 1)
+          if [[ -n "$latest" && "$TAG" != "$(printf '%s\n' "$latest" "$TAG" | sort -V | tail -n 1)" ]]; then
+            echo "::error::$TAG is older than the published release $latest."
+            exit 1
+          fi
+
+          ref="refs/tags/$TAG"
+          if [[ "$TAG" == "$latest" ]]; then
+            if ! git merge-base --is-ancestor "$ref^{commit}" HEAD; then
+              echo "::error::The published release tag must point to a commit on main."
+              exit 1
+            fi
+            echo "published=true" >> "$GITHUB_OUTPUT"
+          elif git show-ref --verify --quiet "$ref"; then
+            if [[ "$(git rev-parse "$ref^{commit}")" != "$(git rev-parse HEAD)" ]]; then
+              echo "::error::Rerun the original workflow for this unpublished tag."
+              exit 1
+            fi
+          else
+            echo "create_tag=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - uses: actions/setup-go@v7
+        if: steps.release.outputs.published != 'true'
         with:
           go-version: "1.27.4"
 
-      - uses: goreleaser/goreleaser-action@v7
+      - name: Check release build
+        if: steps.release.outputs.published != 'true'
+        run: |
+          make check
+          git diff --exit-code -- go.mod go.sum
+
+      - name: Create a token for the release tag
+        if: steps.release.outputs.create_tag == 'true' && vars.RELEASE_APP_CLIENT_ID != ''
+        id: tag-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          version: latest
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+
+      - name: Create the release tag
+        if: steps.release.outputs.create_tag == 'true'
+        env:
+          TAG: ${{ inputs.tag }}
+          GH_TOKEN: ${{ steps.tag-token.outputs.token || github.token }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/git/refs" -f "ref=refs/tags/$TAG" -f "sha=$(git rev-parse HEAD)" --silent
+          git tag "$TAG"
+
+      - uses: goreleaser/goreleaser-action@v7
+        if: steps.release.outputs.published != 'true'
+        with:
+          version: v2.20.2
           args: release --clean
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+          GORELEASER_CURRENT_TAG: ${{ inputs.tag }}
+
+  publish-cask:
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Publish the verified Homebrew cask branch
+        shell: bash
+        env:
+          TAG: ${{ inputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          release=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest")
+          if [[ "$(jq -r .tag_name <<< "$release")" != "$TAG" ]]; then
+            echo "::error::Publish only the cask for the latest release."
+            exit 1
+          fi
+
+          digest=$(jq -r '.assets[] | select(.name == "eo.rb") | .digest' <<< "$release")
+          if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::The latest release needs a generated eo.rb asset with a SHA-256 digest."
+            exit 1
+          fi
+          artifacts=$(mktemp -d)
+          gh release download "$TAG" --pattern eo.rb --dir "$artifacts"
+          (cd "$artifacts" && printf '%s  eo.rb\n' "${digest#sha256:}" | sha256sum -c -)
+          if cmp -s Casks/eo.rb "$artifacts/eo.rb"; then
+            echo "The cask is already on main." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          branch="eo-${TAG#v}"
+          if git show-ref --verify --quiet "refs/remotes/origin/$branch"; then
+            git show "origin/$branch:Casks/eo.rb" | cmp - "$artifacts/eo.rb"
+            git diff --exit-code "origin/main...origin/$branch" -- . ':(exclude)Casks/eo.rb'
+          else
+            cp "$artifacts/eo.rb" Casks/eo.rb
+            git add Casks/eo.rb
+            git -c user.name=github-actions[bot] -c user.email=41898282+github-actions[bot]@users.noreply.github.com \
+              commit -m "Update Homebrew Cask to $TAG"
+            git push origin "HEAD:refs/heads/$branch"
+          fi
+
+          printf '[Open the Homebrew cask PR](%s/%s/compare/main...%s?expand=1)\n' \
+            "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$branch" >> "$GITHUB_STEP_SUMMARY"

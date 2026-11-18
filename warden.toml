@@ -1,0 +1,25 @@
+version = 1
+
+[defaults]
+runtime = "pi"
+failOn = "high"
+reportOn = "medium"
+minConfidence = "medium"
+maxFindings = 15
+
+[defaults.verification]
+enabled = true
+
+[defaults.agent]
+model = "openai/gpt-6-luna"
+effort = "high"
+
+[defaults.auxiliary]
+model = "openai/gpt-6-luna"
+effort = "high"
+
+[[skills]]
+name = "security-review"
+
+[[skills]]
+name = "code-review"

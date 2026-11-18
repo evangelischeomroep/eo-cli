@@ -1,6 +1,6 @@
 # eo-cli
 
-`eo` is a single Go binary that EO developers install through Homebrew to use Azure PIM and EOchat from the terminal. The repo is public, and every `v*` tag ships a release to everyone who installed it.
+`eo` is a single Go binary that EO developers install through Homebrew to use Azure PIM and EOchat from the terminal. The repo is public. GitHub Actions publishes releases from `main`.
 
 ## What we never compromise on
 
@@ -9,7 +9,7 @@
 
 ## Ways to hurt yourself
 
-1. **Tagging from a branch.** Pushing a `v*` tag builds and publishes a release, and every installed `eo` starts announcing it within a day. Tag only a commit that is on `main`.
+1. **Releasing from a branch.** Run the Release workflow from `main` so the release tag points to a reviewed commit.
 2. **Editing the Homebrew cask by hand.** GoReleaser generates `Casks/eo.rb` on every release, so a hand edit is lost. Change the cask through `homebrew_casks` in `.goreleaser.yaml`.
 
 ## Running locally
@@ -37,7 +37,7 @@ Use the [pull-request skill](.agents/skills/pull-request/SKILL.md) when opening 
 
 ## Releasing
 
-Run **Release** from `main` in GitHub Actions and enter a `vX.Y.Z` tag. The workflow checks the code, pushes the tag, publishes the release and links to the generated Homebrew cask update. Homebrew serves the new version after the cask PR merges. See the [release runbook](docs/operations/releases.md) for the steps and the private repository cutover.
+Run **Release** from `main` in GitHub Actions and enter a `vX.Y.Z` tag. The workflow checks the code, creates the tag and publishes the release. The Cask job verifies the generated Cask against the release checksums and links to its PR branch. See the [release runbook](docs/operations/releases.md) for retry steps, tag protection and the private repository cutover.
 
 Commit messages are free-form. GoReleaser omits messages starting with `chore:`, `ci:` or `docs:` from the changelog.
 

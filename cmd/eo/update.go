@@ -87,25 +87,30 @@ func fetchLatestVersion() (string, error) {
 		return cached.Version, nil
 	}
 
-	client := &http.Client{Timeout: updateCheckTimeout}
-	req, err := http.NewRequest(http.MethodGet, updateCheckURL, nil)
+	ctx, cancel := context.WithTimeout(context.Background(), updateCheckTimeout)
+	defer cancel()
+	latest, err := fetchReleaseTag(ctx, updateCheckURL)
+	writeCache(versionCache{Version: latest, CheckedAt: time.Now()})
+	return latest, err
+}
+
+func fetchReleaseTag(ctx context.Context, url string) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return "", err
 	}
 	req.Header.Set("User-Agent", "eo-cli/"+version)
-	if token := githubReleaseToken(); token != "" {
+	if token := githubReleaseToken(ctx); token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
 
-	resp, err := client.Do(req)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		writeCache(versionCache{CheckedAt: time.Now()})
 		return "", err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		writeCache(versionCache{CheckedAt: time.Now()})
 		return "", fmt.Errorf("unexpected status %d", resp.StatusCode)
 	}
 
@@ -113,25 +118,22 @@ func fetchLatestVersion() (string, error) {
 		TagName string `json:"tag_name"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
-		writeCache(versionCache{CheckedAt: time.Now()})
 		return "", err
 	}
 	if release.TagName == "" {
-		writeCache(versionCache{CheckedAt: time.Now()})
 		return "", fmt.Errorf("empty tag_name in response")
 	}
 
-	writeCache(versionCache{Version: release.TagName, CheckedAt: time.Now()})
 	return release.TagName, nil
 }
 
-func githubReleaseToken() string {
+func githubReleaseToken(ctx context.Context) string {
 	if token := strings.TrimSpace(os.Getenv("HOMEBREW_GITHUB_API_TOKEN")); token != "" {
 		return token
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), updateCheckTimeout)
-	defer cancel()
-	out, err := exec.CommandContext(ctx, "gh", "auth", "token", "--hostname", "github.com").Output()
+	cmd := exec.CommandContext(ctx, "gh", "auth", "token", "--hostname", "github.com")
+	cmd.WaitDelay = 25 * time.Millisecond
+	out, err := cmd.Output()
 	if err != nil {
 		return ""
 	}

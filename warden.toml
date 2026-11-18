@@ -21,17 +21,5 @@ effort = "high"
 [[skills]]
 name = "security-review"
 
-[[skills.triggers]]
-type = "pull_request"
-actions = ["labeled"]
-labels = ["warden"]
-draft = false
-
 [[skills]]
 name = "code-review"
-
-[[skills.triggers]]
-type = "pull_request"
-actions = ["labeled"]
-labels = ["warden"]
-draft = false

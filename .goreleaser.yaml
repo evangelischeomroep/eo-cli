@@ -63,19 +63,30 @@ homebrew_casks:
             raise CurlDownloadStrategyError.new(url, "Unexpected eo release URL.") unless match
 
             tag, filename = match.captures
-            asset = GitHub.get_release("evangelischeomroep", "eo-cli", tag).fetch("assets").find do |entry|
-              entry.fetch("name") == filename
-            end
-            raise CurlDownloadStrategyError.new(url, "Release asset not found.") unless asset
+            if (release = accessible_release(tag))
+              asset = release.fetch("assets").find { |entry| entry.fetch("name") == filename }
+              raise CurlDownloadStrategyError.new(url, "Release asset not found.") unless asset
 
-            url = "https://api.github.com/repos/evangelischeomroep/eo-cli/releases/assets/#{Integer(asset.fetch("id"))}"
-            meta[:headers] = [
-              *meta[:headers],
-              "Accept: application/octet-stream",
-              "Authorization: Bearer #{@github_token}",
-            ]
+              url = "https://api.github.com/repos/evangelischeomroep/eo-cli/releases/assets/#{Integer(asset.fetch("id"))}"
+              meta[:headers] = [
+                *meta[:headers],
+                "Accept: application/octet-stream",
+                "Authorization: Bearer #{@github_token}",
+              ]
+            end
           end
           super(url, name, version, **meta)
+        end
+
+        def fetch(timeout: nil)
+          super
+        rescue CurlDownloadStrategyError, ErrorDuringExecution => error
+          raise if @github_token
+
+          raise CurlDownloadStrategyError.new(
+            url, "#{error.message}\nFor a private EO release, run gh auth login with an account that can read eo-cli. " \
+                 "If HOMEBREW_GITHUB_API_TOKEN is set, unset it or replace it with a token that can read eo-cli."
+          )
         end
 
         def curl(*args, secrets: [], **options)
@@ -85,14 +96,21 @@ homebrew_casks:
         def curl_headers(*args, secrets: [], **options)
           super(*args, secrets: [*secrets, @github_token].compact, **options)
         end
+
+        private
+
+        def accessible_release(tag)
+          GitHub.get_release("evangelischeomroep", "eo-cli", tag)
+        rescue GitHub::API::AuthenticationFailedError, GitHub::API::HTTPNotFoundError
+          # A public release can still be fetched without the rejected credential.
+          @github_token = nil
+        end
       end
 
-    skip_upload: auto
+    skip_upload: true
     repository:
       owner: evangelischeomroep
       name: eo-cli
-      # GitHub Actions can push the cask branch. An EO maintainer opens the PR.
-      branch: "{{ .ProjectName }}-{{ .Version }}"
 
 changelog:
   sort: asc
@@ -107,3 +125,7 @@ release:
     owner: evangelischeomroep
     name: eo-cli
   name_template: "v{{ .Version }}"
+  draft: true
+  replace_existing_draft: true
+  extra_files:
+    - glob: dist/homebrew/Casks/eo.rb

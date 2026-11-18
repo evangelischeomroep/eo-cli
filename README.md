@@ -19,12 +19,13 @@
 
 ### Homebrew (macOS and Linux, recommended)
 
-Sign in to GitHub with an account that has access to the EO repository, then install with Homebrew:
+Use Homebrew 7.0.11 or later. Sign in to GitHub with an account that can read the EO repository.
 
 ```bash
 gh auth login --hostname github.com --git-protocol https --web
 gh auth setup-git --hostname github.com
 brew tap evangelischeomroep/eo-cli https://github.com/evangelischeomroep/eo-cli
+brew trust --cask evangelischeomroep/eo-cli/eo
 brew install --cask evangelischeomroep/eo-cli/eo
 ```
 

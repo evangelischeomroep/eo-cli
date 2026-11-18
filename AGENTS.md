@@ -37,7 +37,7 @@ Use the [pull-request skill](.agents/skills/pull-request/SKILL.md) when opening 
 
 ## Releasing
 
-Run **Release** from `main` in GitHub Actions and enter a `vX.Y.Z` tag. The workflow checks the code, creates the tag and publishes the release. The Cask job verifies the generated Cask against the release checksums and links to its PR branch. See the [release runbook](docs/operations/releases.md) for retry steps, tag protection and the private repository cutover.
+Run **Release** from `main` in GitHub Actions and enter a `vX.Y.Z` tag. The workflow checks the code, creates the tag and publishes the release. The Cask job verifies the download against GitHub's asset digest and links to its PR branch. See the [release runbook](docs/operations/releases.md) for retry steps, tag protection and the private repository cutover.
 
 Commit messages are free-form. GoReleaser omits messages starting with `chore:`, `ci:` or `docs:` from the changelog.
 

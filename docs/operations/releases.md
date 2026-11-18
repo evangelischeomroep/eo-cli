@@ -1,14 +1,22 @@
 # Releasing eo
 
 1. Merge the release changes into `main`.
-2. In GitHub Actions, run **Release** from `main` and enter a tag such as `v1.2.3`. The workflow runs `make check`, creates the tag, uploads the archives, checksums and generated Cask to a draft, and publishes the complete release.
-3. Use the compare link in the run summary to open the Cask PR. The Cask job checks the Cask against the published checksums before pushing its branch. Merge that PR after its reviews. Open a Cask PR for the latest release only.
+2. In GitHub Actions, run **Release** from `main` and enter a `vX.Y.Z` tag newer than the highest published stable version. The workflow runs `make check` and creates the tag. GoReleaser publishes after it finishes uploading the archives, checksums and generated Cask.
+3. Use the compare link in the run summary to open the Cask PR. The Cask job verifies the downloaded file against the asset's SHA-256 digest in GitHub before pushing its branch. Merge that PR after its reviews.
 4. Verify the release with Homebrew 7.0.11 or later and an EO GitHub account with repository access. On a clean machine, trust the Cask before running `brew fetch --cask evangelischeomroep/eo-cli/eo`. Run `brew upgrade --cask eo` from an existing installation.
 
 ## Retrying a release
 
-- If the release is still a draft, rerun the original workflow. GoReleaser replaces the incomplete draft for that tag.
-- Once the release is published, rerun the failed Cask job or dispatch **Release** from `main` with the same tag. It downloads the Cask from the published release and reuses an existing cask branch if the generated Cask matches.
+- If the release is still a draft and its tag is newer than the highest published stable version, rerun the original workflow. GoReleaser reuses the draft and replaces duplicate assets.
+- If the latest release is published but its Cask branch failed, rerun the failed Cask job or dispatch **Release** from `main` with the same tag. It downloads the Cask from the published release and reuses an existing branch if the generated Cask matches.
+
+## Testing changes to the generated Cask
+
+Run this from a checkout with the generated Cask and checksum manifest from the same build. Homebrew loads the Cask for all four platform and CPU combinations and checks the selected archive URL and hash.
+
+```bash
+brew ruby -- scripts/test-release-cask.rb v1.2.3 dist/homebrew/Casks/eo.rb dist/checksums.txt
+```
 
 ## Protecting release tags
 

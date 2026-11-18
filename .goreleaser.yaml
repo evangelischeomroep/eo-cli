@@ -125,7 +125,8 @@ release:
     owner: evangelischeomroep
     name: eo-cli
   name_template: "v{{ .Version }}"
-  draft: true
-  replace_existing_draft: true
+  use_existing_draft: true
+  replace_existing_artifacts: true
+  make_latest: "legacy"
   extra_files:
     - glob: dist/homebrew/Casks/eo.rb

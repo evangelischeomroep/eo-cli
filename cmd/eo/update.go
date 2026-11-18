@@ -16,6 +16,7 @@ import (
 const (
 	updateCheckURL     = "https://api.github.com/repos/evangelischeomroep/eo-cli/releases/latest"
 	updateCheckTTL     = 24 * time.Hour
+	updateCheckRetry   = 5 * time.Minute
 	updateCheckTimeout = 400 * time.Millisecond
 	updateCheckWait    = 500 * time.Millisecond
 )
@@ -23,6 +24,14 @@ const (
 type versionCache struct {
 	Version   string    `json:"version"`
 	CheckedAt time.Time `json:"checked_at"`
+}
+
+func (c versionCache) fresh(now time.Time) bool {
+	ttl := updateCheckTTL
+	if c.Version == "" {
+		ttl = updateCheckRetry
+	}
+	return now.Sub(c.CheckedAt) < ttl
 }
 
 func startUpdateCheck() <-chan string {
@@ -83,7 +92,7 @@ func normalize(v string) string {
 }
 
 func fetchLatestVersion() (string, error) {
-	if cached, err := readCache(); err == nil && time.Since(cached.CheckedAt) < updateCheckTTL {
+	if cached, err := readCache(); err == nil && cached.fresh(time.Now()) {
 		return cached.Version, nil
 	}
 
@@ -95,18 +104,17 @@ func fetchLatestVersion() (string, error) {
 }
 
 func fetchReleaseTag(ctx context.Context, url string) (string, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	token := githubReleaseToken(ctx)
+	resp, err := requestRelease(ctx, url, token)
 	if err != nil {
 		return "", err
 	}
-	req.Header.Set("User-Agent", "eo-cli/"+version)
-	if token := githubReleaseToken(ctx); token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", err
+	if token != "" && (resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusNotFound) {
+		resp.Body.Close()
+		resp, err = requestRelease(ctx, url, "")
+		if err != nil {
+			return "", err
+		}
 	}
 	defer resp.Body.Close()
 
@@ -125,6 +133,18 @@ func fetchReleaseTag(ctx context.Context, url string) (string, error) {
 	}
 
 	return release.TagName, nil
+}
+
+func requestRelease(ctx context.Context, url, token string) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", "eo-cli/"+version)
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	return http.DefaultClient.Do(req)
 }
 
 func githubReleaseToken(ctx context.Context) string {

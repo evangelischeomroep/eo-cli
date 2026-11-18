@@ -34,15 +34,22 @@ jobs:
           TAG: ${{ inputs.tag }}
           GH_TOKEN: ${{ github.token }}
         run: |
-          if [[ ! "$TAG" =~ ^v(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})$ ]]; then
+          stable_tag='^v(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})$'
+          if [[ ! "$TAG" =~ $stable_tag ]]; then
             echo "::error::Use a release tag in the form vX.Y.Z."
             exit 1
           fi
 
-          published_tags=$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases" \
-            --jq '.[] | select(.draft == false) | .tag_name')
+          latest=$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases" \
+            --jq '.[] | select(.draft == false and .prerelease == false) | .tag_name' \
+            | sed -nE "/$stable_tag/p" | sort -V | tail -n 1)
+          if [[ -n "$latest" && "$TAG" != "$(printf '%s\n' "$latest" "$TAG" | sort -V | tail -n 1)" ]]; then
+            echo "::error::$TAG is older than the published release $latest."
+            exit 1
+          fi
+
           ref="refs/tags/$TAG"
-          if grep -Fxq -- "$TAG" <<< "$published_tags"; then
+          if [[ "$TAG" == "$latest" ]]; then
             if ! git merge-base --is-ancestor "$ref^{commit}" HEAD; then
               echo "::error::The published release tag must point to a commit on main."
               exit 1
@@ -95,13 +102,6 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           GORELEASER_CURRENT_TAG: ${{ inputs.tag }}
 
-      - name: Publish the complete release
-        if: steps.release.outputs.published != 'true'
-        env:
-          TAG: ${{ inputs.tag }}
-          GH_TOKEN: ${{ github.token }}
-        run: gh release edit "$TAG" --draft=false --latest --verify-tag
-
   publish-cask:
     needs: release
     runs-on: ubuntu-latest
@@ -119,14 +119,20 @@ jobs:
           TAG: ${{ inputs.tag }}
           GH_TOKEN: ${{ github.token }}
         run: |
-          if [[ "$(gh release view --json tagName --jq .tagName)" != "$TAG" ]]; then
+          release=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest")
+          if [[ "$(jq -r .tag_name <<< "$release")" != "$TAG" ]]; then
             echo "::error::Publish only the cask for the latest release."
             exit 1
           fi
 
+          digest=$(jq -r '.assets[] | select(.name == "eo.rb") | .digest' <<< "$release")
+          if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::The latest release needs a generated eo.rb asset with a SHA-256 digest."
+            exit 1
+          fi
           artifacts=$(mktemp -d)
-          gh release download "$TAG" --pattern eo.rb --pattern checksums.txt --dir "$artifacts"
-          python3 scripts/verify-release-cask.py "$TAG" "$artifacts/eo.rb" "$artifacts/checksums.txt"
+          gh release download "$TAG" --pattern eo.rb --dir "$artifacts"
+          (cd "$artifacts" && printf '%s  eo.rb\n' "${digest#sha256:}" | sha256sum -c -)
           if cmp -s Casks/eo.rb "$artifacts/eo.rb"; then
             echo "The cask is already on main." >> "$GITHUB_STEP_SUMMARY"
             exit 0

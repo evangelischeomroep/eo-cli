@@ -18,17 +18,21 @@ func newPimCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "pim",
 		Short: "Manage Azure PIM activations and approvals",
+		Long:  "Manage Azure PIM activations and approvals. With one subscription, eo uses it; with several, it asks which one, unless you pass --subscription.",
 		Args:  cobra.NoArgs,
 		RunE:  func(cmd *cobra.Command, _ []string) error { return cmd.Help() },
 	}
+	var subscription string
+	cmd.PersistentFlags().StringVarP(&subscription, "subscription", "s", "", "Subscription name or ID")
+	_ = cmd.RegisterFlagCompletionFunc("subscription", completeSubscriptions)
 	activate := &cobra.Command{
 		Use:               "activate [reason]",
 		Short:             "Activate the Contributor role for 8 hours",
-		Long:              fmt.Sprintf("Activate the Contributor role on the %q subscription for 8 hours. Azure records the optional reason in the PIM audit log.", azure.SubscriptionName),
-		Example:           "  eo pim activate\n  eo pim activate \"deploying release 2.4\"",
+		Long:              "Activate the Contributor role on a subscription for 8 hours. Azure records the optional reason in the PIM audit log.",
+		Example:           "  eo pim activate\n  eo pim activate \"deploying release 2.4\"\n  eo pim activate -s \"EO Studio Digitaal\"",
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: cobra.NoFileCompletions,
-		RunE:              func(_ *cobra.Command, args []string) error { return cmdPimRequest(optionalArg(args)) },
+		RunE:              func(_ *cobra.Command, args []string) error { return cmdPimRequest(subscription, optionalArg(args)) },
 	}
 	var approveAll bool
 	approve := &cobra.Command{
@@ -39,7 +43,7 @@ func newPimCommand() *cobra.Command {
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: cobra.NoFileCompletions,
 		RunE: func(_ *cobra.Command, args []string) error {
-			return cmdPimApprove(approveAll, optionalArg(args))
+			return cmdPimApprove(subscription, approveAll, optionalArg(args))
 		},
 	}
 	approve.Flags().BoolVar(&approveAll, "all", false, "Approve all pending requests without prompting")
@@ -47,48 +51,47 @@ func newPimCommand() *cobra.Command {
 		Use:   "status",
 		Short: "Show whether your Contributor role is active and when it expires",
 		Args:  cobra.NoArgs,
-		RunE:  func(*cobra.Command, []string) error { return cmdPimStatus() },
+		RunE:  func(*cobra.Command, []string) error { return cmdPimStatus(subscription) },
 	})
 	return cmd
 }
 
-func cmdPimStatus() error {
-	creds, err := loadCreds(true)
+func cmdPimStatus(subscription string) error {
+	creds, err := loadCreds(subscription, true)
 	if err != nil {
 		return err
 	}
 
-	expiry, err := pim.GetContributorRoleExpiry(creds.subscriptionID, creds.userID, creds.accessToken)
+	expiry, err := pim.GetContributorRoleExpiry(creds.subscription.ID, creds.userID, creds.accessToken)
 	if err != nil {
 		return err
 	}
 
 	remaining := time.Until(expiry)
 	if expiry.IsZero() || remaining <= 0 {
-		fmt.Println(red("✗ ") + "Contributor role is not active.")
+		fmt.Println(red("✗ ") + "Contributor role on " + cyan(creds.subscription.Name) + " is not active.")
 		return nil
 	}
 
 	h := int(remaining.Hours())
 	m := int(remaining.Minutes()) % 60
-	fmt.Printf("%s Contributor role is active — expires in %s\n", green("✓"), bold(fmt.Sprintf("%dh %dm", h, m)))
+	fmt.Printf("%s Contributor role on %s is active — expires in %s\n", green("✓"), cyan(creds.subscription.Name), bold(fmt.Sprintf("%dh %dm", h, m)))
 	return nil
 }
 
-func cmdPimRequest(justification string) error {
-	fmt.Println(bold("→ Activating Contributor role on ") + cyan(azure.SubscriptionName) + bold(" (8h)"))
-	fmt.Println()
-
-	creds, err := loadCreds(true)
+func cmdPimRequest(subscription, justification string) error {
+	creds, err := loadCreds(subscription, true)
 	if err != nil {
 		return err
 	}
+	fmt.Println(bold("→ Activating Contributor role on ") + cyan(creds.subscription.Name) + bold(" (8h)"))
+	fmt.Println()
 
 	if justification == "" {
 		justification = "Requesting access to perform necessary tasks."
 	}
 
-	err = pim.RequestContributorRole(creds.subscriptionID, creds.userID, creds.accessToken, justification)
+	err = pim.RequestContributorRole(creds.subscription.ID, creds.userID, creds.accessToken, justification)
 	switch {
 	case errors.Is(err, azure.ErrRoleAlreadyActive):
 		fmt.Println(yellow("⚠ ") + "Contributor role is already active — nothing to do.")
@@ -134,20 +137,20 @@ func principalLabel(resolved map[string]pim.Principal, id string) string {
 	return id
 }
 
-func cmdPimApprove(approveAll bool, justification string) error {
+func cmdPimApprove(subscription string, approveAll bool, justification string) error {
 	if justification == "" {
 		justification = defaultPimApprovalJustification
 	}
 
-	creds, err := loadCreds(false)
+	creds, err := loadCreds(subscription, false)
 	if err != nil {
 		return err
 	}
 
-	fmt.Println(dim("→ Fetching pending PIM approval requests..."))
+	fmt.Println(dim("→ Fetching pending PIM approval requests on " + creds.subscription.Name + "..."))
 	fmt.Println()
 
-	pending, err := pim.ListPendingApprovals(creds.subscriptionID, creds.accessToken)
+	pending, err := pim.ListPendingApprovals(creds.subscription.ID, creds.accessToken)
 	if err != nil {
 		return fmt.Errorf("listing approvals: %w", err)
 	}
@@ -175,7 +178,7 @@ func cmdPimApprove(approveAll bool, justification string) error {
 	for _, r := range toApprove {
 		role := pim.RoleDisplayName(r.Properties.RoleDefinitionID)
 		who := principalLabel(principals, r.Properties.PrincipalID)
-		if err := pim.ApproveScheduleRequest(creds.subscriptionID, creds.accessToken, r, justification); err != nil {
+		if err := pim.ApproveScheduleRequest(creds.subscription.ID, creds.accessToken, r, justification); err != nil {
 			fmt.Printf("  %s %s for %s\n     %s\n", red("✗"), bold(role), who, dim(err.Error()))
 			failed++
 			continue

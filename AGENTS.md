@@ -14,7 +14,7 @@
 
 ## Running locally
 
-`go run ./cmd/eo <command>` runs the CLI from source; `make build` writes a binary to `/tmp/eo`. A local build has version `dev`, which skips the update check. The Azure commands need `az login` and access to the _EO Studio Digitaal_ subscription; `pim approve` also needs you to be an approver on the PIM policy.
+`go run ./cmd/eo <command>` runs the CLI from source; `make build` writes a binary to `/tmp/eo`. A local build has version `dev`, which skips the update check. The Azure commands need `az login` and access to at least one subscription, which they pick from `az account list`; `pim approve` also needs you to be an approver on the PIM policy.
 
 | Name             | Purpose                                               |
 | ---------------- | ----------------------------------------------------- |

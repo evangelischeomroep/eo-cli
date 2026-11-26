@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"os/exec"
+	"sort"
 	"strings"
 	"time"
 )
@@ -25,8 +26,6 @@ const (
 	ContributorRoleID = "b24988ac-6180-42a0-ab88-20f7382dd24c"
 	OwnerRoleID       = "8e3af657-a8ff-443c-a75c-2fe8c4bcb635"
 	ReaderRoleID      = "acdd72a7-3385-48ef-bd42-f606fba81ae7"
-
-	SubscriptionName = "EO Studio Digitaal"
 
 	ArmBaseURL         = "https://management.azure.com"
 	ScheduleAPIVersion = "2020-10-01"
@@ -121,16 +120,81 @@ func azCLI(args ...string) (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
-func GetSubscriptionID() (string, error) {
-	return azCLI("account", "list", "--query", fmt.Sprintf("[?name=='%s'].id", SubscriptionName), "-o", "tsv")
+type Subscription struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	State     string `json:"state"`
+	IsDefault bool   `json:"isDefault"`
+}
+
+// ListSubscriptions returns the enabled subscriptions the Azure CLI knows for
+// the signed-in user, sorted by name. The CLI caches this list at `az login`.
+func ListSubscriptions() ([]Subscription, error) {
+	out, err := azCLI("account", "list", "-o", "json")
+	if err != nil {
+		return nil, err
+	}
+	return parseSubscriptions(out)
+}
+
+func parseSubscriptions(raw string) ([]Subscription, error) {
+	var all []Subscription
+	if err := json.Unmarshal([]byte(raw), &all); err != nil {
+		return nil, fmt.Errorf("parsing subscriptions: %w", err)
+	}
+	// The same subscription is listed once per tenant it is reachable from.
+	seen := map[string]bool{}
+	var subs []Subscription
+	for _, s := range all {
+		if s.State != "Enabled" || seen[strings.ToLower(s.ID)] {
+			continue
+		}
+		seen[strings.ToLower(s.ID)] = true
+		subs = append(subs, s)
+	}
+	sort.SliceStable(subs, func(i, j int) bool {
+		return strings.ToLower(subs[i].Name) < strings.ToLower(subs[j].Name)
+	})
+	return subs, nil
+}
+
+// FindSubscription picks the subscription whose ID or name matches query,
+// ignoring case.
+func FindSubscription(subs []Subscription, query string) (Subscription, error) {
+	var byName []Subscription
+	for _, s := range subs {
+		if strings.EqualFold(s.ID, query) {
+			return s, nil
+		}
+		if strings.EqualFold(s.Name, query) {
+			byName = append(byName, s)
+		}
+	}
+	switch len(byName) {
+	case 1:
+		return byName[0], nil
+	case 0:
+		names := make([]string, len(subs))
+		for i, s := range subs {
+			names[i] = s.Name
+		}
+		if len(names) == 0 {
+			return Subscription{}, fmt.Errorf("subscription %q not found", query)
+		}
+		return Subscription{}, fmt.Errorf("subscription %q not found; available: %s", query, strings.Join(names, ", "))
+	default:
+		return Subscription{}, fmt.Errorf("more than one subscription is named %q; use its ID instead", query)
+	}
 }
 
 func GetUserID() (string, error) {
 	return azCLI("ad", "signed-in-user", "show", "--query", "id", "-o", "tsv")
 }
 
-func GetAccessToken() (string, error) {
-	return azCLI("account", "get-access-token", "--query", "accessToken", "-o", "tsv")
+// GetAccessToken returns an ARM token for the tenant of the given
+// subscription, so subscriptions in other tenants work too.
+func GetAccessToken(subscriptionID string) (string, error) {
+	return azCLI("account", "get-access-token", "--subscription", subscriptionID, "--query", "accessToken", "-o", "tsv")
 }
 
 type AccountInfo struct {

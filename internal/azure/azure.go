@@ -34,6 +34,10 @@ const (
 
 var ErrRoleAlreadyActive = errors.New("role is already active")
 
+// ErrLoginRequired means the Azure CLI's sign-in has expired or is missing,
+// for example after Conditional Access's sign-in frequency check.
+var ErrLoginRequired = errors.New("your Azure sign-in has expired")
+
 type APIError struct {
 	Method     string
 	URL        string
@@ -113,6 +117,9 @@ func azCLI(args ...string) (string, error) {
 	if err != nil {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) && len(exitErr.Stderr) > 0 {
+			if needsLogin(string(exitErr.Stderr)) {
+				return "", fmt.Errorf("%w; run `az login` and try again", ErrLoginRequired)
+			}
 			return "", fmt.Errorf("az %s: %s", strings.Join(args, " "), strings.TrimSpace(string(exitErr.Stderr)))
 		}
 		return "", fmt.Errorf("az %s: %w", strings.Join(args, " "), err)
@@ -221,10 +228,23 @@ func GetUserID() (string, error) {
 // PIM-eligible.
 func GetAccessToken(tenantID string) (string, error) {
 	args := []string{"account", "get-access-token", "--query", "accessToken", "-o", "tsv"}
+	login := "az login"
 	if tenantID != "" {
 		args = append(args, "--tenant", tenantID)
+		login += " --tenant " + tenantID
 	}
-	return azCLI(args...)
+	token, err := azCLI(args...)
+	if errors.Is(err, ErrLoginRequired) {
+		return "", fmt.Errorf("%w; run `%s` and try again", ErrLoginRequired, login)
+	}
+	return token, err
+}
+
+// needsLogin recognises the Azure CLI's "sign in again" errors, which end
+// with its advice to run `az login`.
+func needsLogin(stderr string) bool {
+	return strings.Contains(stderr, "az login") &&
+		(strings.Contains(stderr, "AADSTS") || strings.Contains(stderr, "expired"))
 }
 
 type AccountInfo struct {

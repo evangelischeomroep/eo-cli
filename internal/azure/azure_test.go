@@ -54,6 +54,16 @@ func TestFindSubscription(t *testing.T) {
 	}
 }
 
+func TestNeedsLogin(t *testing.T) {
+	expired := "ERROR: AADSTS70043: The refresh token has expired or is invalid due to sign-in frequency checks by conditional access.\nRun the command below to authenticate interactively; additional arguments may be added as needed:\naz logout\naz login --tenant \"x\""
+	if !needsLogin(expired) {
+		t.Error("expired sign-in not recognised")
+	}
+	if needsLogin("ERROR: Subscription 'x' not found.") {
+		t.Error("unrelated error treated as expired sign-in")
+	}
+}
+
 func TestMergeSubscriptions(t *testing.T) {
 	known := []Subscription{{ID: "bbb", Name: "EO Studio Digitaal", IsDefault: true}}
 	eligible := []Subscription{{ID: "BBB", Name: "EO Studio Digitaal"}, {ID: "aaa", Name: "ai-team"}}

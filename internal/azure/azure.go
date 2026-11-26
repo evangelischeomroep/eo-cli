@@ -34,10 +34,6 @@ const (
 
 var ErrRoleAlreadyActive = errors.New("role is already active")
 
-// ErrLoginRequired means the Azure CLI's sign-in has expired or is missing,
-// for example after Conditional Access's sign-in frequency check.
-var ErrLoginRequired = errors.New("your Azure sign-in has expired")
-
 type APIError struct {
 	Method     string
 	URL        string
@@ -117,9 +113,6 @@ func azCLI(args ...string) (string, error) {
 	if err != nil {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) && len(exitErr.Stderr) > 0 {
-			if needsLogin(string(exitErr.Stderr)) {
-				return "", fmt.Errorf("%w; run `az login` and try again", ErrLoginRequired)
-			}
 			return "", fmt.Errorf("az %s: %s", strings.Join(args, " "), strings.TrimSpace(string(exitErr.Stderr)))
 		}
 		return "", fmt.Errorf("az %s: %w", strings.Join(args, " "), err)
@@ -131,12 +124,11 @@ type Subscription struct {
 	ID        string `json:"id"`
 	Name      string `json:"name"`
 	State     string `json:"state"`
-	TenantID  string `json:"tenantId"`
 	IsDefault bool   `json:"isDefault"`
 }
 
-// ListSubscriptions returns the enabled subscriptions the Azure CLI knows for
-// the signed-in user, sorted by name. The CLI caches this list at `az login`.
+// ListSubscriptions returns the enabled subscriptions of the signed-in user,
+// sorted by name. The Azure CLI stores this list at `az login`.
 func ListSubscriptions() ([]Subscription, error) {
 	out, err := azCLI("account", "list", "-o", "json")
 	if err != nil {
@@ -150,92 +142,38 @@ func parseSubscriptions(raw string) ([]Subscription, error) {
 	if err := json.Unmarshal([]byte(raw), &all); err != nil {
 		return nil, fmt.Errorf("parsing subscriptions: %w", err)
 	}
-	var enabled []Subscription
+	var subs []Subscription
 	for _, s := range all {
 		if s.State == "Enabled" {
-			enabled = append(enabled, s)
-		}
-	}
-	return MergeSubscriptions(enabled), nil
-}
-
-// MergeSubscriptions combines lists into one sorted by name, keeping the
-// first entry for each ID; the same subscription can be listed once per
-// tenant it is reachable from.
-func MergeSubscriptions(lists ...[]Subscription) []Subscription {
-	seen := map[string]bool{}
-	var subs []Subscription
-	for _, list := range lists {
-		for _, s := range list {
-			if seen[strings.ToLower(s.ID)] {
-				continue
-			}
-			seen[strings.ToLower(s.ID)] = true
 			subs = append(subs, s)
 		}
 	}
 	sort.SliceStable(subs, func(i, j int) bool {
 		return strings.ToLower(subs[i].Name) < strings.ToLower(subs[j].Name)
 	})
-	return subs
+	return subs, nil
 }
 
-// FindSubscription picks the subscription whose ID or name matches query,
+// FindSubscription picks the subscription whose name or ID matches query,
 // ignoring case.
 func FindSubscription(subs []Subscription, query string) (Subscription, error) {
-	var byName []Subscription
-	for _, s := range subs {
-		if strings.EqualFold(s.ID, query) {
+	names := make([]string, len(subs))
+	for i, s := range subs {
+		if strings.EqualFold(s.Name, query) || strings.EqualFold(s.ID, query) {
 			return s, nil
 		}
-		if strings.EqualFold(s.Name, query) {
-			byName = append(byName, s)
-		}
+		names[i] = s.Name
 	}
-	switch len(byName) {
-	case 1:
-		return byName[0], nil
-	case 0:
-		names := make([]string, len(subs))
-		for i, s := range subs {
-			names[i] = s.Name
-		}
-		if len(names) == 0 {
-			return Subscription{}, fmt.Errorf("subscription %q not found", query)
-		}
-		return Subscription{}, fmt.Errorf("subscription %q not found; available: %s", query, strings.Join(names, ", "))
-	default:
-		return Subscription{}, fmt.Errorf("more than one subscription is named %q; use its ID instead", query)
-	}
+	return Subscription{}, fmt.Errorf("subscription %q not found; available: %s", query, strings.Join(names, ", "))
 }
 
 func GetUserID() (string, error) {
 	return azCLI("ad", "signed-in-user", "show", "--query", "id", "-o", "tsv")
 }
 
-// GetAccessToken returns an ARM token for the given tenant, or for the
-// default tenant when tenantID is empty. It asks by tenant, not subscription,
-// because the CLI does not know subscriptions where the user is only
-// PIM-eligible.
-func GetAccessToken(tenantID string) (string, error) {
-	args := []string{"account", "get-access-token", "--query", "accessToken", "-o", "tsv"}
-	login := "az login"
-	if tenantID != "" {
-		args = append(args, "--tenant", tenantID)
-		login += " --tenant " + tenantID
-	}
-	token, err := azCLI(args...)
-	if errors.Is(err, ErrLoginRequired) {
-		return "", fmt.Errorf("%w; run `%s` and try again", ErrLoginRequired, login)
-	}
-	return token, err
-}
-
-// needsLogin recognises the Azure CLI's "sign in again" errors, which end
-// with its advice to run `az login`.
-func needsLogin(stderr string) bool {
-	return strings.Contains(stderr, "az login") &&
-		(strings.Contains(stderr, "AADSTS") || strings.Contains(stderr, "expired"))
+// GetAccessToken returns an ARM token for the tenant of the given subscription.
+func GetAccessToken(subscriptionID string) (string, error) {
+	return azCLI("account", "get-access-token", "--subscription", subscriptionID, "--query", "accessToken", "-o", "tsv")
 }
 
 type AccountInfo struct {

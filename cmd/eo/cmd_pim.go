@@ -24,7 +24,7 @@ func newPimCommand() *cobra.Command {
 	}
 	var subscription string
 	cmd.PersistentFlags().StringVarP(&subscription, "subscription", "s", "", "Subscription name or ID")
-	_ = cmd.RegisterFlagCompletionFunc("subscription", completeSubscriptions)
+	_ = cmd.RegisterFlagCompletionFunc("subscription", cobra.NoFileCompletions)
 	activate := &cobra.Command{
 		Use:               "activate [reason]",
 		Short:             "Activate the Contributor role for 8 hours",

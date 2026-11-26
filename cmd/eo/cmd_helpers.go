@@ -38,9 +38,6 @@ func loadCreds(subscription string, needUser bool) (*azureCreds, error) {
 	}
 
 	subs, err := listSubscriptions(true)
-	if errors.Is(err, azure.ErrLoginRequired) {
-		return nil, err
-	}
 	if err != nil {
 		return nil, fmt.Errorf("listing subscriptions: %w", err)
 	}
@@ -65,31 +62,29 @@ func loadCreds(subscription string, needUser bool) (*azureCreds, error) {
 
 // listSubscriptions combines the subscriptions the Azure CLI knows with the
 // ones where the user is only PIM-eligible, which the CLI does not list.
-// A tenant whose eligibilities cannot be read is skipped, with a warning when
-// warn is set.
+// It only looks in the tenants of the known subscriptions: other tenants the
+// user once signed in to (as a guest, say) often demand a fresh sign-in, and
+// a new tenant is rare enough to ask for `az login`. A tenant whose
+// eligibilities cannot be read is skipped; an expired sign-in there surfaces
+// only if the user picks a subscription in it.
 func listSubscriptions(warn bool) ([]azure.Subscription, error) {
-	var known []azure.Subscription
-	var tenants []string
-	var g errgroup.Group
-	g.Go(func() (err error) {
-		known, err = azure.ListSubscriptions()
-		return err
-	})
-	g.Go(func() error {
-		// Without a tenant list, the default tenant still gets checked.
-		ts, err := azure.ListTenants()
-		if err != nil || len(ts) == 0 {
-			ts = []string{""}
-		}
-		tenants = ts
-		return nil
-	})
-	if err := g.Wait(); err != nil {
+	known, err := azure.ListSubscriptions()
+	if err != nil {
 		return nil, err
+	}
+	var tenants []string
+	seen := map[string]bool{}
+	for _, s := range known {
+		if !seen[s.TenantID] {
+			seen[s.TenantID] = true
+			tenants = append(tenants, s.TenantID)
+		}
+	}
+	if len(tenants) == 0 {
+		tenants = []string{""}
 	}
 
 	eligible := make([][]azure.Subscription, len(tenants))
-	errs := make([]error, len(tenants))
 	var wg sync.WaitGroup
 	for i, tenant := range tenants {
 		wg.Add(1)
@@ -99,21 +94,12 @@ func listSubscriptions(warn bool) ([]azure.Subscription, error) {
 			if err == nil {
 				eligible[i], err = pim.ListEligibleSubscriptions(tenant, token)
 			}
-			errs[i] = err
-			// An expired sign-in is reported once below, not as a warning.
 			if err != nil && warn && !errors.Is(err, azure.ErrLoginRequired) {
 				fmt.Fprintln(os.Stderr, yellow("⚠ ")+dim(fmt.Sprintf("Skipped PIM-eligible subscriptions in tenant %s: %v", tenant, err)))
 			}
 		}()
 	}
 	wg.Wait()
-	// Activating needs the same sign-in, so stop before offering a list
-	// that is incomplete and would fail anyway.
-	for _, err := range errs {
-		if errors.Is(err, azure.ErrLoginRequired) {
-			return nil, err
-		}
-	}
 	return azure.MergeSubscriptions(append([][]azure.Subscription{known}, eligible...)...), nil
 }
 

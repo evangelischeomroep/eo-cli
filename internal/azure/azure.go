@@ -180,15 +180,6 @@ func MergeSubscriptions(lists ...[]Subscription) []Subscription {
 	return subs
 }
 
-// ListTenants returns the IDs of the tenants the Azure CLI is signed in to.
-func ListTenants() ([]string, error) {
-	out, err := azCLI("account", "tenant", "list", "--query", "[].tenantId", "-o", "tsv")
-	if err != nil {
-		return nil, err
-	}
-	return strings.Fields(out), nil
-}
-
 // FindSubscription picks the subscription whose ID or name matches query,
 // ignoring case.
 func FindSubscription(subs []Subscription, query string) (Subscription, error) {

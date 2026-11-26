@@ -83,7 +83,7 @@ eo pim activate -s "EO Studio Digitaal" "deploying release 2.4"
 eo pim status --subscription ai-team
 ```
 
-The list combines the subscriptions the Azure CLI stored at `az login` with the ones where you are only PIM-eligible, for every tenant you are signed in to. If a subscription is still missing, run `az login` again; for a subscription in another tenant, sign in to that tenant with `az login --tenant <tenant-id>`.
+The list combines the subscriptions the Azure CLI stored at `az login` with the ones in the same tenants where you are only PIM-eligible. If a subscription is missing, run `az login` again.
 
 ### `eo pim activate`
 

@@ -53,3 +53,12 @@ func TestFindSubscription(t *testing.T) {
 		})
 	}
 }
+
+func TestMergeSubscriptions(t *testing.T) {
+	known := []Subscription{{ID: "bbb", Name: "EO Studio Digitaal", IsDefault: true}}
+	eligible := []Subscription{{ID: "BBB", Name: "EO Studio Digitaal"}, {ID: "aaa", Name: "ai-team"}}
+	got := MergeSubscriptions(known, eligible)
+	if len(got) != 2 || got[0].ID != "aaa" || !got[1].IsDefault {
+		t.Fatalf("merged = %+v, want ai-team and the known EO Studio Digitaal entry", got)
+	}
+}

@@ -3,12 +3,15 @@ package main
 import (
 	"errors"
 	"fmt"
+	"os"
+	"sync"
 
 	"charm.land/huh/v2"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/evangelischeomroep/eo-cli/internal/azure"
+	"github.com/evangelischeomroep/eo-cli/internal/pim"
 )
 
 type azureCreds struct {
@@ -34,7 +37,7 @@ func loadCreds(subscription string, needUser bool) (*azureCreds, error) {
 		})
 	}
 
-	subs, err := azure.ListSubscriptions()
+	subs, err := listSubscriptions(true)
 	if err != nil {
 		return nil, fmt.Errorf("listing subscriptions: %w", err)
 	}
@@ -45,7 +48,7 @@ func loadCreds(subscription string, needUser bool) (*azureCreds, error) {
 
 	var token string
 	g.Go(func() (err error) {
-		token, err = azure.GetAccessToken(sub.ID)
+		token, err = azure.GetAccessToken(sub.TenantID)
 		if err != nil {
 			return fmt.Errorf("getting access token: %w", err)
 		}
@@ -55,6 +58,50 @@ func loadCreds(subscription string, needUser bool) (*azureCreds, error) {
 		return nil, err
 	}
 	return &azureCreds{subscription: sub, accessToken: token, userID: userID}, nil
+}
+
+// listSubscriptions combines the subscriptions the Azure CLI knows with the
+// ones where the user is only PIM-eligible, which the CLI does not list.
+// A tenant whose eligibilities cannot be read is skipped, with a warning when
+// warn is set.
+func listSubscriptions(warn bool) ([]azure.Subscription, error) {
+	var known []azure.Subscription
+	var tenants []string
+	var g errgroup.Group
+	g.Go(func() (err error) {
+		known, err = azure.ListSubscriptions()
+		return err
+	})
+	g.Go(func() error {
+		// Without a tenant list, the default tenant still gets checked.
+		ts, err := azure.ListTenants()
+		if err != nil || len(ts) == 0 {
+			ts = []string{""}
+		}
+		tenants = ts
+		return nil
+	})
+	if err := g.Wait(); err != nil {
+		return nil, err
+	}
+
+	eligible := make([][]azure.Subscription, len(tenants))
+	var wg sync.WaitGroup
+	for i, tenant := range tenants {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			token, err := azure.GetAccessToken(tenant)
+			if err == nil {
+				eligible[i], err = pim.ListEligibleSubscriptions(tenant, token)
+			}
+			if err != nil && warn {
+				fmt.Fprintln(os.Stderr, yellow("⚠ ")+dim(fmt.Sprintf("Skipped PIM-eligible subscriptions in tenant %s: %v", tenant, err)))
+			}
+		}()
+	}
+	wg.Wait()
+	return azure.MergeSubscriptions(append([][]azure.Subscription{known}, eligible...)...), nil
 }
 
 func chooseSubscription(subs []azure.Subscription, query string) (azure.Subscription, error) {
@@ -95,7 +142,7 @@ func chooseSubscription(subs []azure.Subscription, query string) (azure.Subscrip
 
 // completeSubscriptions offers the user's subscription names for --subscription.
 func completeSubscriptions(_ *cobra.Command, _ []string, _ string) ([]cobra.Completion, cobra.ShellCompDirective) {
-	subs, err := azure.ListSubscriptions()
+	subs, err := listSubscriptions(false)
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}

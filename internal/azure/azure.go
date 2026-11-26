@@ -124,6 +124,7 @@ type Subscription struct {
 	ID        string `json:"id"`
 	Name      string `json:"name"`
 	State     string `json:"state"`
+	TenantID  string `json:"tenantId"`
 	IsDefault bool   `json:"isDefault"`
 }
 
@@ -142,20 +143,43 @@ func parseSubscriptions(raw string) ([]Subscription, error) {
 	if err := json.Unmarshal([]byte(raw), &all); err != nil {
 		return nil, fmt.Errorf("parsing subscriptions: %w", err)
 	}
-	// The same subscription is listed once per tenant it is reachable from.
+	var enabled []Subscription
+	for _, s := range all {
+		if s.State == "Enabled" {
+			enabled = append(enabled, s)
+		}
+	}
+	return MergeSubscriptions(enabled), nil
+}
+
+// MergeSubscriptions combines lists into one sorted by name, keeping the
+// first entry for each ID; the same subscription can be listed once per
+// tenant it is reachable from.
+func MergeSubscriptions(lists ...[]Subscription) []Subscription {
 	seen := map[string]bool{}
 	var subs []Subscription
-	for _, s := range all {
-		if s.State != "Enabled" || seen[strings.ToLower(s.ID)] {
-			continue
+	for _, list := range lists {
+		for _, s := range list {
+			if seen[strings.ToLower(s.ID)] {
+				continue
+			}
+			seen[strings.ToLower(s.ID)] = true
+			subs = append(subs, s)
 		}
-		seen[strings.ToLower(s.ID)] = true
-		subs = append(subs, s)
 	}
 	sort.SliceStable(subs, func(i, j int) bool {
 		return strings.ToLower(subs[i].Name) < strings.ToLower(subs[j].Name)
 	})
-	return subs, nil
+	return subs
+}
+
+// ListTenants returns the IDs of the tenants the Azure CLI is signed in to.
+func ListTenants() ([]string, error) {
+	out, err := azCLI("account", "tenant", "list", "--query", "[].tenantId", "-o", "tsv")
+	if err != nil {
+		return nil, err
+	}
+	return strings.Fields(out), nil
 }
 
 // FindSubscription picks the subscription whose ID or name matches query,
@@ -191,10 +215,16 @@ func GetUserID() (string, error) {
 	return azCLI("ad", "signed-in-user", "show", "--query", "id", "-o", "tsv")
 }
 
-// GetAccessToken returns an ARM token for the tenant of the given
-// subscription, so subscriptions in other tenants work too.
-func GetAccessToken(subscriptionID string) (string, error) {
-	return azCLI("account", "get-access-token", "--subscription", subscriptionID, "--query", "accessToken", "-o", "tsv")
+// GetAccessToken returns an ARM token for the given tenant, or for the
+// default tenant when tenantID is empty. It asks by tenant, not subscription,
+// because the CLI does not know subscriptions where the user is only
+// PIM-eligible.
+func GetAccessToken(tenantID string) (string, error) {
+	args := []string{"account", "get-access-token", "--query", "accessToken", "-o", "tsv"}
+	if tenantID != "" {
+		args = append(args, "--tenant", tenantID)
+	}
+	return azCLI(args...)
 }
 
 type AccountInfo struct {

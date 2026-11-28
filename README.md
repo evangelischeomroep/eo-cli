@@ -64,7 +64,7 @@ go install github.com/evangelischeomroep/eo-cli/cmd/eo@latest
 ## Requirements
 
 - [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli) installed and logged in (`az login`)
-- Access to the _EO Studio Digitaal_ subscription
+- Access to at least one Azure subscription with PIM, such as _EO Studio Digitaal_
 - For `pim approve`: you must be an approver on the relevant PIM policy
 - For `ask` / `mcp`: an EOchat account on [chat.eo.nl](https://chat.eo.nl) and a personal API key (see below)
 
@@ -73,6 +73,17 @@ go install github.com/evangelischeomroep/eo-cli/cmd/eo@latest
 ```
 eo <command> [flags] [arguments]
 ```
+
+### Choosing a subscription
+
+The `pim` commands work on any subscription your Azure account can reach. With one subscription, `eo` uses it; with several, it asks which one. Pass `--subscription` (`-s`) with a name or ID to skip the question, for example in scripts:
+
+```bash
+eo pim activate -s "EO Studio Digitaal" "deploying release 2.4"
+eo pim status --subscription ai-team
+```
+
+`eo` uses the list the Azure CLI stored at `az login`; after you get access to a new subscription, run `az login` again.
 
 ### `eo pim activate`
 

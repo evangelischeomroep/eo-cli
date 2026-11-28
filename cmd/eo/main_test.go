@@ -20,6 +20,8 @@ func TestPimRequiresExplicitActivation(t *testing.T) {
 		{name: "old justification form", args: []string{"deploying release 2.4"}, wantErr: true},
 		{name: "explicit activation", args: []string{"activate", "deploying release 2.4"}, want: "activate"},
 		{name: "explicit approval", args: []string{"approve", "--all", "sprint review"}, want: "approve"},
+		{name: "subscription flag", args: []string{"activate", "-s", "EO Studio Digitaal", "deploying"}, want: "activate"},
+		{name: "subscription before command", args: []string{"--subscription", "ai-team", "status"}, want: "status"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			cmd := newPimCommand()
@@ -54,6 +56,8 @@ func TestGeneratedHelpAndCompletions(t *testing.T) {
 		{"Zsh script", []string{"completion", "zsh"}, "#compdef eo"},
 		{"Fish script", []string{"completion", "fish"}, "# fish completion for eo"},
 		{"approval flag", []string{"__completeNoDesc", "pim", "approve", "--a"}, "--all\n"},
+		{"subscription flag", []string{"__completeNoDesc", "pim", "status", "--s"}, "--subscription\n"},
+		{"subscription help", []string{"help", "pim", "activate"}, "--subscription"},
 		{"project flag", []string{"__completeNoDesc", "mcp", "install", "--p"}, "--project\n"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
